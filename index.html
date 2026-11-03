@@ -1727,7 +1727,6 @@ function updateAction(ch,dt){
   }else if(a.type==='tap'){
     const T=a.T,f=fwd(ch),spot=tableWorld(T,a.cup.rest,new V3()).addScaledVector(f,-.12).add(new V3(0,.018,0)).addScaledVector(new V3(-f.z,0,f.x),-.06);
     const reach=seg(t,0,.5),back=seg(t,1.7,2.2),tap=(t>.55&&t<1.65)?Math.abs(Math.sin((t-.55)*Math.PI*2.7))*.035:0;
-    for(const kt of[.92,1.29,1.66]){if(t>=kt&&!(a.knocks>kt)){a.knocks=kt;knock(spot);}}
     const handT=lapR.clone().lerp(spot.clone().add(new V3(0,tap,0)),reach*(1-back));ik(R,handT,poleW(ch,-1,_p1));ik(L,lapL,poleW(ch,1,_p2));
     ch.headPivot.rotation.x=.1*reach*(1-back);
     if(t>=a.dur){ch.action=null;ch.headPivot.rotation.x=0;}
