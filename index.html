@@ -858,7 +858,7 @@ $('lanternClose').addEventListener('click',closeLantern);
 $('lanternText').addEventListener('input',()=>{$('lanternGo').disabled=!$('lanternText').value.trim();});
 for(const b of document.querySelectorAll('.lkind button'))b.addEventListener('click',()=>{lanternKind=b.dataset.k;for(const o of document.querySelectorAll('.lkind button')){o.classList.toggle('on',o===b);o.setAttribute('aria-checked',o===b);}});
 $('lanternGo').addEventListener('click',()=>{const txt=$('lanternText').value.trim();if(!txt||!canLantern())return closeLantern();
-  const dx=LAKE.x-me.x,dz=LAKE.z-me.z;me.ry=Math.atan2(dx,dz);const L=makeLantern(txt,lanternKind);me.action={type:'lantern',t:0,L};lanternWatch=L;closeLantern();lastHud='';
+  const dx=LAKE.x-me.x,dz=LAKE.z-me.z;me.ry=Math.atan2(dx,dz);const L=makeLantern(txt,lanternKind);me.action={type:'lantern',t:0,L};NET.act('lantern',{txt,kind:lanternKind});lanternWatch=L;closeLantern();lastHud='';
   toast(lanternKind==='worry'?'근심을 실은 풍등이 멀리 날아가요':'소원을 실은 풍등이 하늘로 올라가요');});
 /* ---------- first-visit guide to the tea cabinet ---------- */
 const guide={active:true,start:0,turn:0};
@@ -898,7 +898,7 @@ function updateCourtCensers(dt,t){for(const C of COURT_CENSERS)for(let bi=C.burn
       p.sp.material.opacity=(k<.08?k/.08:1-k)*.3;if(k>=1){scene.remove(p.sp);B.puffs.splice(i,1);}}
     if(B.t>B.life&&!B.puffs.length){for(const s of B.sticks){scene.remove(s.st);scene.remove(s.em);}C.burns.splice(bi,1);}}}
 $('offerBtn').addEventListener('click',()=>{const C=nearCourtCenser();if(!C||me.action)return;const dx=C.x-me.x,dz=C.z-me.z,d=Math.hypot(dx,dz);me.ry=Math.atan2(dx,dz);
-  const want=C.R+.5,u=new V3(dx/d,0,dz/d),home=new V3(C.x-u.x*want,0,C.z-u.z*want);me.action={type:'offer',t:0,C,lit:false,from:new V3(me.x,0,me.z),home,dir:u};lastHud='';canvas.focus();});
+  const want=C.R+.5,u=new V3(dx/d,0,dz/d),home=new V3(C.x-u.x*want,0,C.z-u.z*want);me.action={type:'offer',t:0,C,lit:false,from:new V3(me.x,0,me.z),home,dir:u};NET.act('offer',{ci:COURT_CENSERS.indexOf(C)});lastHud='';canvas.focus();});
 /* ---------- stone skipping (물수제비) ---------- */
 const skipStones=[],SKIP_GEO=new THREE.CylinderGeometry(.045,.05,.014,12),SKIP_M=M(0x8a8478,{map:rockMap,roughness:.8});
 function canSkip(){if(me.mode!=='walk'||me.seat||me.action)return false;return lakeZone();}
@@ -906,7 +906,7 @@ function startSkip(){if(!canSkip())return;me.route=[];me.pending=null;ring.visib
   {const px=me.x+f.x*4,pz=me.z+f.z*4;if(lakeL(px,pz)>1.2){dir.set(LAKE.x-me.x,0,LAKE.z-me.z).normalize();}}
   me.ry=Math.atan2(dir.x,dir.z);const m=new THREE.Mesh(SKIP_GEO,SKIP_M);m.visible=false;m.layers.enableAll();scene.add(m);
   const st={m,free:false,vx:0,vy:0,vz:0,sp:7+rnd()*2.5,hops:0,max:2+Math.floor(rnd()*rnd()*9),sink:0};skipStones.push(st);
-  me.action={type:'skip',t:0,dir,stone:st,thrown:false};lastHud='';}
+  me.action={type:'skip',t:0,dir,stone:st,thrown:false};NET.act('skip',{d:[+dir.x.toFixed(3),+dir.z.toFixed(3)],sp:st.sp,max:st.max});lastHud='';}
 $('skipBtn').addEventListener('click',()=>{startSkip();canvas.focus();});
 function updateSkipStones(dt){for(let i=skipStones.length-1;i>=0;i--){const st=skipStones[i],m=st.m;if(!st.free)continue;
     if(st.sink>0){st.sink+=dt;m.position.y-=dt*.25;if(st.sink>1.2){scene.remove(m);skipStones.splice(i,1);}continue;}
@@ -915,7 +915,7 @@ function updateSkipStones(dt){for(let i=skipStones.length-1;i>=0;i--){const st=s
     if(overWater&&m.position.y<=LAKE.y+.01&&st.vy<0){const hs=Math.hypot(st.vx,st.vz);
       if(st.hops<st.max&&hs>1.6){st.hops++;m.position.y=LAKE.y+.012;st.vy=Math.min(2.6,.45+hs*.22);st.vx*=.78;st.vz*=.78;spawnRipple(m.position.x,m.position.z);}
       else{st.sink=.001;spawnRipple(m.position.x,m.position.z);spawnRipple(m.position.x+st.vx*.05,m.position.z+st.vz*.05);
-        toast(st.hops?`물수제비 ${st.hops}번 통통 튀었어요`:'퐁당! 돌이 바로 가라앉았어요');}}
+        if(!st.remote)toast(st.hops?`물수제비 ${st.hops}번 통통 튀었어요`:'퐁당! 돌이 바로 가라앉았어요');}}
     else if(!overWater&&m.position.y<groundY(m.position.x,m.position.z)){scene.remove(m);skipStones.splice(i,1);}}}
 let errand=null,errandT=18;
 function updateErrand(dt){
@@ -1760,7 +1760,7 @@ function updateAction(ch,dt){
     if(pray>0){hR.lerp(chest.clone().addScaledVector(side,-.012),pray);hL.lerp(chest.clone().addScaledVector(side,.012),pray);}
     ik(R,hR,poleW(ch,-1,_p1));ik(L,hL,poleW(ch,1,_p2));
     const bow=t>4.2&&t<7.4?(.5-.5*Math.cos((t-4.2)*Math.PI*2/1.6)):0;ch.hips.rotation.x=.3*bow*pray;ch.headPivot.rotation.x=.15*pray+.2*bow*pray;
-    if(!a.lit&&t>1.65){a.lit=true;lightCourt(C,a.home);toast('향을 꽂고 합장하며 기도해요');}
+    if(!a.lit&&t>1.65){a.lit=true;lightCourt(C,a.home);if(ch===me)toast('향을 꽂고 합장하며 기도해요');}
     if(t>8.0){ch.action=null;ch.hips.rotation.x=0;ch.headPivot.rotation.x=0;}
   }else if(a.type==='skip'){
     // side-arm throw: wind the stone back low, whip it out flat across the water
@@ -2095,7 +2095,7 @@ const NET=(()=>{
   function drop(P){if(P.raft)P.raft.g.visible=false;if(P.c){scene.remove(P.c.root);if(P.c.bubble){scene.remove(P.c.bubble.sp);P.c.bubble=null;}}
     for(const s of seats)if(s.occ&&s.occ===P.c)s.occ=null;members.delete(P.uid);}
   function seatAt(ti,k){const T=tables[ti];return T&&seatOf(T,k);}
-  function applySeat(ti,k,who){const s=seatAt(ti,k);if(!s)return;
+  function applySeat(ti,k,who){const s=seatAt(ti,k);if(!s)return;if(k===0&&!who)endRemoteBrew(ti);
     if(who===uid){return;}
     if(s.occ&&s.occ.isRemote)s.occ=null;
     const P=who&&members.get(who);if(P){avatar(P);s.occ=P.c;P.c.seat=s;}
@@ -2123,12 +2123,14 @@ const NET=(()=>{
       case 'seatDenied':{const s=seatAt(m.ti,m.k);if(s&&me.seat===s){s.occ=null;me.seat=null;setPose(me,'stand');me.x=s.x-Math.sin(s.ry)*.6;me.z=s.z-Math.cos(s.ry)*.6;me.y=0;lastHud='';}
         toast(m.why==='noTea'?'팽주가 되려면 먼저 찻장에서 차를 골라 주세요':'이미 다른 분이 앉은 자리예요');break;}
       case 'player':{if(m.uid===uid){me.tea=m.tea;me.teaLeft=m.teaLeft;me.brewedAt=m.tea&&m.brewedAt!=null?m.brewedAt:null;lastHud='';}break;}
-      case 'serve':{if(m.by===uid)break;const T=tables[m.ti];if(!T)break;if(m.tea&&TEAS[m.tea])setTeaColor(T,m.tea);
+      case 'brewstep':{if(m.by===uid)break;if(m.step==='start')startRemoteBrew(m.ti,m.tea);else remoteBrewStep(m.ti,m.step);break;}
+      case 'serve':{if(m.by===uid)break;const T=tables[m.ti];if(!T)break;if(remoteBrews.has(m.ti)){const rb=remoteBrews.get(m.ti);if(rb.step!=='poured')endRemoteBrew(m.ti);}if(m.tea&&TEAS[m.tea])setTeaColor(T,m.tea);
         for(const k of m.ks){const c=T.cups[k];if(c&&c.state!=='host'){c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}}
         T.pitcherLevel=1;startServe(T);break;}
       case 'drink':{const P=members.get(m.uid),T=tables[m.ti],c=T&&T.cups[m.k];if(P&&P.c&&c){if(c.state!=='guest'){c.state='guest';c.level=1;c.rest=c.guestPos.clone();c.g.position.copy(c.rest);}startDrink(P.c,c);}break;}
       case 'cupback':{const T=tables[m.ti];const c=T&&T.cups[m.k];if(c&&c.state==='guest'){c.level=0;sendCup(c,false);}break;}
       case 'cheers':{if(m.by===uid)break;cheersAt(tables[m.ti]);break;}
+      case 'act':{const P=members.get(m.uid);if(P&&P.c)replayAct(P.c,m.kind,m.d||{});break;}
       case 'mood':{const P=members.get(m.uid);if(P&&P.c)showMood(P.c,m.e);break;}
     }}
   function showFull(m){const pn=$('fullPanel');if(!pn)return;$('fullText').textContent=`${m.ch}채널은 지금 만원이에요 (${m.count}/${m.cap}명).`;
@@ -2160,7 +2162,8 @@ const NET=(()=>{
     mood(e){out({t:'mood',e});},
     others(){return[...members.values()].filter(P=>P.online&&P.c&&P.seen).map(P=>({x:P.tx,z:P.tz,nick:P.nick}));},
     sit(seat){out({t:'sit',ti:seat.table.i,k:seat.k});},stand(){out({t:'stand'});},tea(key){out({t:'tea',key});},
-    brewed(){out({t:'brewed'});},drink(){out({t:'drink'});},cupback(){out({t:'cupback'});},cheers(){out({t:'cheers'});},
+    act(kind,d){out({t:'act',kind,d});},
+    brewed(){out({t:'brewed'});},brewStep(step,tea){out({t:'brewstep',step,tea});},drink(){out({t:'drink'});},cupback(){out({t:'cupback'});},cheers(){out({t:'cheers'});},
     get members(){return members;}
   };})();
 
@@ -2209,7 +2212,7 @@ function feedKoi(){let P;
     const lx=Math.cos(me.ry),lz=-Math.sin(me.ry);hand=(dx*lx+dz*lz)>=0?'L':'R';}   // local +x is the character's left
   else{me.route=[];ring.visible=false;P=feedPoint();if(!P){toast('물가에 더 가까이 가 주세요');return;}
     me.ry=Math.atan2(P.x-me.x,P.z-me.z);}
-  clearAction(me);me.action={type:'toss',t:0,P,thrown:false,hand};}
+  clearAction(me);me.action={type:'toss',t:0,P,thrown:false,hand};NET.act('toss',{p:[+P.x.toFixed(2),+P.z.toFixed(2)],hand});}
 function throwPellets(ch,P,hand){const A=ch.arms[hand||'R'];A.hand.updateMatrixWorld(true);const h=new V3();A.hand.getWorldPosition(h);
   for(let i=0;i<16;i++){const m=new THREE.Mesh(pelletGeo,pelletMat);m.visible=false;scene.add(m);const land=ch.mode!=='boat',sc=land?.3:.5,dist=Math.hypot(P.x-h.x,P.z-h.z);
     pellets.push({m,sx:h.x,sz:h.z,sy:h.y,tx:P.x+(rnd()-.5)*sc,tz:P.z+(rnd()-.5)*sc,t:-i*.03,life:40,arc:land?clamp(.15+dist*.2,.15,.6):1.1,dur:land?.45:.7});}
@@ -2218,7 +2221,7 @@ function throwPellets(ch,P,hand){const A=ch.arms[hand||'R'];A.hand.updateMatrixW
   const n=feedStreak===1?3+Math.floor(Math.random()*3):feedStreak===2?5+Math.floor(Math.random()*2):7,pool=kois.filter(k=>!k.follow&&Math.hypot(k.x-P.x,k.z-P.z)<45),fresh=pool.filter(k=>!k.ate).sort(()=>Math.random()-.5),
     pick=fresh.length>=n?fresh.slice(0,n):fresh.concat(pool.filter(k=>k.ate).sort(()=>Math.random()-.5)).slice(0,n);for(const k of pick)k.ate=true;const eaters=new Set(pick);
   pick.forEach((k,i)=>{if(Math.hypot(k.x-P.x,k.z-P.z)>4.6){const a=i/pick.length*Math.PI*2+Math.random()*.6,r=3.4+Math.random()*.9;let x=P.x+Math.cos(a)*r,z=P.z+Math.sin(a)*r;const L=lakeL(x,z);if(L>1.15){const q=Math.sqrt(1.15/L);x=LAKE.x+(x-LAKE.x)*q;z=LAKE.z+(z-LAKE.z)*q;}k.x=x;k.z=z;k.h=Math.atan2(P.x-x,P.z-z);k.yy=Math.max(groundY(x,z)+.14,LAKE.y-.9);}});
-  for(const k of kois)k.settleT=0;feeding={P,t:40,after:0,eaters};toast('잉어들이 먹이를 먹으러 모여들어요');}
+  for(const k of kois)k.settleT=0;feeding={P,t:40,after:0,eaters};if(ch===me)toast('잉어들이 먹이를 먹으러 모여들어요');}
 
 /* ---------- stone lanterns around the lake and day / night ---------- */
 const CONTACT_GEO=new THREE.PlaneGeometry(1.1,1.1).rotateX(-Math.PI/2),CONTACT_M=new THREE.MeshBasicMaterial({transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-3,
@@ -2286,12 +2289,12 @@ const kettle=(()=>{const g=new THREE.Group();const iron=M(0x2c2a28,{roughness:.5
 const waterStream=new THREE.Mesh(cyl(.005,.004,1,6),new THREE.MeshStandardMaterial({color:0xdfeef0,transparent:true,opacity:.55,roughness:.05}));waterStream.visible=false;waterStream.layers.set(1);scene.add(waterStream);
 const BREW_TEXT={ready:['찻잎 넣기','다호 뚜껑을 열고 찻잎을 넣어요'],leafing:['','찻잎이 다호 속으로 들어가요'],leafDone:['물 붓기','찻잎 위로 뜨거운 물을 부어요'],watering:['','물이 차오르며 찻잎이 풀려요'],watered:['공도배에 따르기','뚜껑을 닫고 공도배에 따라요'],closing:['','뚜껑을 닫는 중'],
   closed:['유리 공도배에 따르기','충분히 우러났어요'],pouring:['','공도배에 따르는 중'],poured:['차 따르기','공도배의 차를 손님 찻잔에 나눠 따라요']};
-function startBrew(T){me.brew={T,step:'ready',t:0};setTeaColor(T,me.tea,false);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);cam.mode='fp';me.root.visible=false;T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
+function startBrew(T){me.brew={T,step:'ready',t:0,tea:me.tea};NET.brewStep('start',me.tea);setTeaColor(T,me.tea,false);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);cam.mode='fp';me.root.visible=false;T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
   {const V=T.vessel,Rm=Math.max(.006,profR(V.prof,V.floor+.006)*.75-.011);T.leafPlan=T.potLeaves.map(()=>{const a=rnd()*Math.PI*2,r=Math.sqrt(rnd())*Rm;return{x:Math.cos(a)*r,z:Math.sin(a)*r,y:V.floor+.002+rnd()*.006,d:rnd()*.45,r:rnd()*6,sx:-.025-rnd()*.07,sz:(rnd()-.5)*.016};});}lastHud='';}
 function brewNext(){const b=me.brew,T=b.T;
-  if(b.step==='ready'){b.step='leafing';b.t=0;}
-  else if(b.step==='leafDone'){b.step='watering';b.t=0;}
-  else if(b.step==='watered'){b.step='closing';b.t=0;}
+  if(b.step==='ready'){b.step='leafing';b.t=0;NET.brewStep('leafing');}
+  else if(b.step==='leafDone'){b.step='watering';b.t=0;NET.brewStep('watering');}
+  else if(b.step==='watered'){b.step='closing';b.t=0;NET.brewStep('closing');}
   else if(b.step==='closed'){b.step='pouring';b.t=0;T.busy=true;}
   else if(b.step==='poured'){me.brew=null;cam.mode='follow';me.root.visible=true;$('brewCap').hidden=true;T.ready=true;T.potWater.visible=false;
     NET.brewed();me.teaLeft--;me.brewedAt=T.i;const nm=TEAS[me.tea].name;if(me.teaLeft<=0){me.tea=null;me.brewedAt=null;}
@@ -2306,28 +2309,28 @@ function pourAgain(T){if(!me.tea||me.teaLeft<=0)return;NET.brewed();me.teaLeft--
 const POT_PROF=[[0,.05],[.02,.068],[.048,.078],[.072,.072],[.09,.055],[.1,.037]];
 function potR(y){for(let i=1;i<POT_PROF.length;i++){const[a,ra]=POT_PROF[i-1],[b,rb]=POT_PROF[i];if(y<=b)return lerp(ra,rb,clamp((y-a)/(b-a),0,1));}return .037;}
 const LID_ASIDE=new V3(0,-.004,.16);
-function updateBrew(dt){const b=me.brew;if(!b)return;const T=b.T,pot=T.pot;b.t+=dt;T.group.updateMatrixWorld(true);
+function stepBrew(b,dt){const T=b.T,pot=T.pot,sc=b.scoop||scoop,kt=b.kettle||kettle,wst=b.ws||waterStream;b.t+=dt;T.group.updateMatrixWorld(true);
   const t=b.t;
   if(b.step==='leafing'){const k=seg(t,0,.7);T.lid.position.lerpVectors(T.lidRest,LID_ASIDE,k);T.lid.position.y+=Math.sin(k*Math.PI)*.08;
     const mouthW=tableWorld(T,new V3(T.potRest.x,T.potRest.y+T.vessel.top,T.potRest.z),new V3());
     const toPot=new V3(1,0,0).applyAxisAngle(YAX,T.rot),roll=0,pitchK=seg(t,.75,1.25),tipW=mouthW.clone().add(new V3(0,.07,0)).addScaledVector(toPot,-.012);
-    scoop.visible=t>.55&&t<2.4;scoop.position.copy(tipW);
-    scoop.quaternion.setFromAxisAngle(YAX,T.rot+Math.PI/2).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0,0,1),-.12-.62*pitchK)).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(1,0,0),roll));
-    scoop.updateMatrixWorld(true);T.pot.updateMatrixWorld(true);
+    sc.visible=t>.55&&t<2.4;sc.position.copy(tipW);
+    sc.quaternion.setFromAxisAngle(YAX,T.rot+Math.PI/2).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0,0,1),-.12-.62*pitchK)).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(1,0,0),roll));
+    sc.updateMatrixWorld(true);T.pot.updateMatrixWorld(true);
     T.potLeaves.forEach((l,i)=>{const P=T.leafPlan[i],slide=clamp((t-1.05-P.d)/.35,0,1),fall=clamp((t-1.05-P.d-.35)/.35,0,1);l.visible=t>.6;
-      if(fall<=0){const w=scoop.localToWorld(new V3(lerp(P.sx,.004,slide*slide),.006,P.sz));T.pot.worldToLocal(w);l.position.copy(w);}
-      else{const w=scoop.localToWorld(new V3(.004,.006,P.sz));T.pot.worldToLocal(w);l.position.set(lerp(w.x,P.x,fall),lerp(w.y,P.y,fall*fall),lerp(w.z,P.z,fall));}
+      if(fall<=0){const w=sc.localToWorld(new V3(lerp(P.sx,.004,slide*slide),.006,P.sz));T.pot.worldToLocal(w);l.position.copy(w);}
+      else{const w=sc.localToWorld(new V3(.004,.006,P.sz));T.pot.worldToLocal(w);l.position.set(lerp(w.x,P.x,fall),lerp(w.y,P.y,fall*fall),lerp(w.z,P.z,fall));}
       l.rotation.set(P.r,P.r*.6+slide*2,P.r*.5);});
-    if(t>2.7){b.step='leafDone';scoop.visible=false;lastHud='';}}
+    if(t>2.7){b.step='leafDone';sc.visible=false;lastHud='';}}
   else if(b.step==='watering'){const mouthW=tableWorld(T,new V3(T.potRest.x,T.potRest.y+T.vessel.top,T.potRest.z),new V3()),side=new V3(0,0,1).applyAxisAngle(YAX,T.rot);
     const away=mouthW.clone().addScaledVector(side,.42).add(new V3(0,-.1,0)),near=mouthW.clone().addScaledVector(side,.2).add(new V3(0,.12,0));
-    const inK=seg(t,0,.8),tilt=seg(t,.8,1.2)-seg(t,3.0,3.4),outK=seg(t,3.4,4.2);kettle.visible=t<4.2;
-    kettle.position.lerpVectors(away,near,inK);if(outK>0)kettle.position.lerpVectors(near,away,outK);kettle.rotation.set(0,T.rot+Math.PI/2,0);kettle.rotateZ(-.75*tilt);
-    const pouring=t>1.1&&t<3.1;waterStream.visible=pouring;
-    if(pouring){kettle.updateMatrixWorld(true);const tip=kettle.localToWorld(new V3(.151,.116,0)),pt=mouthW.clone().add(new V3(0,-.03,0));waterStream.position.copy(tip).add(pt).multiplyScalar(.5);waterStream.scale.set(1,tip.distanceTo(pt),1);waterStream.quaternion.setFromUnitVectors(UP,tip.clone().sub(pt).normalize());}
-    const lv=seg(t,1.2,3.1);const wy=setVesselWater(T,lv);T.potWater.material.color.setHex(0xdfeef0).lerp(new THREE.Color(TEAS[me.tea].liquor),lv*.85);
+    const inK=seg(t,0,.8),tilt=seg(t,.8,1.2)-seg(t,3.0,3.4),outK=seg(t,3.4,4.2);kt.visible=t<4.2;
+    kt.position.lerpVectors(away,near,inK);if(outK>0)kt.position.lerpVectors(near,away,outK);kt.rotation.set(0,T.rot+Math.PI/2,0);kt.rotateZ(-.75*tilt);
+    const pouring=t>1.1&&t<3.1;wst.visible=pouring;
+    if(pouring){kt.updateMatrixWorld(true);const tip=kt.localToWorld(new V3(.151,.116,0)),pt=mouthW.clone().add(new V3(0,-.03,0));wst.position.copy(tip).add(pt).multiplyScalar(.5);wst.scale.set(1,tip.distanceTo(pt),1);wst.quaternion.setFromUnitVectors(UP,tip.clone().sub(pt).normalize());}
+    const lv=seg(t,1.2,3.1);const wy=setVesselWater(T,lv);T.potWater.material.color.setHex(0xdfeef0).lerp(new THREE.Color(TEAS[b.tea].liquor),lv*.85);
     {const V=T.vessel;T.potLeaves.forEach((l,i)=>{const P=T.leafPlan[i];if(lv>0){const y=Math.max(P.y,Math.min(wy-.006,P.y+(wy-V.floor)*.5)-(i%3)*.005),rr=Math.max(.006,profR(V.prof,y)*.8-.011),r=Math.hypot(P.x,P.z),k=r>rr?rr/r:1;l.position.set(P.x*k,y,P.z*k);l.rotation.y+=dt*(.6+i%4*.2);}});}
-    if(t>4.3){kettle.visible=false;b.step='watered';lastHud='';}}
+    if(t>4.3){kt.visible=false;b.step='watered';lastHud='';}}
   else if(b.step==='closing'){const k=seg(t,0,.7);T.lid.position.lerpVectors(LID_ASIDE,T.lidRest,k);T.lid.position.y+=Math.sin(k*Math.PI)*.08;if(t>.75){T.lid.position.copy(T.lidRest);b.step='pouring';b.t=0;T.busy=true;lastHud='';}}
   else if(b.step==='pouring'){const V=T.vessel,rest=T.potRest,pour=pourAbovePitcher(T,V.tip,TT+.27,V.tilt);
     const lift=seg(t,0,.8),tilt=seg(t,.8,1.3)-seg(t,3.4,3.9),back=seg(t,3.9,4.7);
@@ -2336,7 +2339,20 @@ function updateBrew(dt){const b=me.brew;if(!b)return;const T=b.T,pot=T.pot;b.t+=
     const pouring=t>1.2&&t<3.5;T.stream.visible=pouring;
     if(pouring){pot.updateMatrixWorld(true);verticalStream(T,pot.localToWorld(V.tip.clone()));T.pitcherLevel=Math.min(1,T.pitcherLevel+dt*.45);}
     if(t>4.8){pot.position.copy(rest);pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.busy=false;b.step='poured';lastHud='';}}
-  const cap=BREW_TEXT[b.step];$('brewCap').hidden=false;$('brewCap').textContent=`${TEAS[me.tea].full} · ${cap[1]}`;}
+}
+// other players' brewing is replayed on this screen step by step (leaves, water, lid, fair cup) from the host's events
+const remoteBrews=new Map();
+function prepBrew(T,tea){setTeaColor(T,tea,false);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
+  const V=T.vessel,Rm=Math.max(.006,profR(V.prof,V.floor+.006)*.75-.011);T.leafPlan=T.potLeaves.map(()=>{const a=rnd()*Math.PI*2,r=Math.sqrt(rnd())*Rm;return{x:Math.cos(a)*r,z:Math.sin(a)*r,y:V.floor+.002+rnd()*.006,d:rnd()*.45,r:rnd()*6,sx:-.025-rnd()*.07,sz:(rnd()-.5)*.016};});}
+function startRemoteBrew(ti,tea){const T=tables[ti];if(!T||!TEAS[tea]||(me.brew&&me.brew.T===T))return;endRemoteBrew(ti);
+  const b={T,step:'ready',t:0,tea,remote:true,scoop:scoop.clone(),kettle:kettle.clone(true),ws:waterStream.clone()};for(const o of[b.scoop,b.kettle,b.ws]){o.visible=false;scene.add(o);}
+  prepBrew(T,tea);remoteBrews.set(ti,b);}
+function remoteBrewStep(ti,step){const b=remoteBrews.get(ti);if(!b)return;if(['leafing','watering','closing'].includes(step)){b.step=step;b.t=0;if(step==='closing')b.T.busy=false;}}
+function endRemoteBrew(ti){const b=remoteBrews.get(ti);if(!b)return;remoteBrews.delete(ti);for(const o of[b.scoop,b.kettle,b.ws])scene.remove(o);
+  const T=b.T;T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;T.potWater.visible=false;}
+function updateBrew(dt){
+  if(me.brew){const b=me.brew;stepBrew(b,dt);if(me.brew){const cap=BREW_TEXT[b.step];$('brewCap').hidden=false;$('brewCap').textContent=`${TEAS[b.tea].full} · ${cap[1]}`;}}
+  for(const[ti,b]of remoteBrews){stepBrew(b,dt);if(b.step==='poured'){b.pt=(b.pt||0)+dt;if(b.pt>8)endRemoteBrew(ti);}}}
 function fpView(posOut,lookOut){const b=me.brew,T=b.T;const toHost=new V3(-1,0,0).applyAxisAngle(YAX,T.rot);
   if(b.step==='pouring'||b.step==='poured'){const pit=tableWorld(T,new V3(T.pitcher.position.x,T.pitcher.position.y+.06,T.pitcher.position.z),new V3());
     const side=new V3(0,0,1).applyAxisAngle(YAX,T.rot);lookOut.copy(pit).add(new V3(.0,.0,0)).addScaledVector(toHost,-.06);posOut.copy(pit).addScaledVector(side,-.55).addScaledVector(toHost,.28).add(new V3(0,.24,0));}
@@ -2403,7 +2419,7 @@ $('actBtn').addEventListener('click',()=>{doAct();canvas.focus();});
 function shoreSpot(){const dx=me.x-LAKE.x,dz=me.z-LAKE.z,sr=Math.sqrt(lakeL(me.x,me.z));if(sr<1.25)return null;const k=1.215/sr;return[LAKE.x+dx*k,LAKE.z+dz*k];}
 function goShoreThen(what){const p=shoreSpot();if(!p||me.mode!=='walk')return false;walkTo(p[0],p[1]);if(me.route.length){me.pending=what;return true;}return false;}
 $('feedBtn').addEventListener('click',()=>{if(me.mode==='walk'&&placeNow()==='garden'&&goShoreThen('feed')){canvas.focus();return;}feedKoi();canvas.focus();});
-$('incenseBtn').addEventListener('click',()=>{const T=me.seat&&me.seat.table;if(T&&!me.action&&!T.incense&&!T.incensePending){T.incensePending=true;me.action={type:'incense',t:0,dur:2.5,T:me.seat.table};toast('향을 피웠어요. 잔잔한 연기가 피어올라요');lastHud='';}canvas.focus();});
+$('incenseBtn').addEventListener('click',()=>{const T=me.seat&&me.seat.table;if(T&&!me.action&&!T.incense&&!T.incensePending){T.incensePending=true;me.action={type:'incense',t:0,dur:2.5,T:me.seat.table};NET.act('incense',{ti:T.i});toast('향을 피웠어요. 잔잔한 연기가 피어올라요');lastHud='';}canvas.focus();});
 $('soundBtn').addEventListener('click',()=>{setSound(!SND.on);canvas.focus();});
 // sound comes on with the first tap/click/key (mobile browsers only allow audio to start from touchend/click, not pointerdown);
 // it is also woken up again after the phone was locked or a call interrupted it
@@ -2426,9 +2442,19 @@ $('moodBtn').addEventListener('click',()=>{$('moodBar').hidden=!$('moodBar').hid
 const onDock=(x,z)=>x>=DOCK.x0-.2&&x<=DOCK.x1+.2&&z>=DOCK.z0-.3&&z<=DOCK.z1+.2;
 $('waitBtn').addEventListener('click',()=>{if(!(me.mode==='walk'&&placeNow()==='dock'))return;const others=NET.others().filter(o=>onDock(o.x,o.z));
   if(others.length>=1)boardFerry('people');else boardFerry(true);canvas.focus();});
+// another player's action, replayed on their avatar: incense, sweets, courtyard offering, stone skipping, feeding, sky lantern
+function replayAct(ch,kind,d){if(ch.action&&kind!=='toss')clearAction(ch);
+  if(kind==='incense'){const T=tables[d.ti];if(T&&!T.incense){T.incensePending=true;ch.action={type:'incense',t:0,dur:2.5,T};}}
+  else if(kind==='snack'){if(ch.seat&&ch.seat.table)startSnack(ch);}
+  else if(kind==='offer'){const C=COURT_CENSERS[d.ci];if(!C)return;const dx=C.x-ch.x,dz=C.z-ch.z,dd=Math.hypot(dx,dz)||1,u=new V3(dx/dd,0,dz/dd),want=C.R+.5;
+    ch.action={type:'offer',t:0,C,lit:false,from:new V3(ch.x,0,ch.z),home:new V3(C.x-u.x*want,0,C.z-u.z*want),dir:u};}
+  else if(kind==='skip'&&Array.isArray(d.d)){const dir=new V3(d.d[0],0,d.d[1]).normalize(),m=new THREE.Mesh(SKIP_GEO,SKIP_M);m.visible=false;m.layers.enableAll();scene.add(m);
+    const st={m,free:false,vx:0,vy:0,vz:0,sp:+d.sp||8,hops:0,max:d.max|0,sink:0,remote:true};skipStones.push(st);ch.action={type:'skip',t:0,dir,stone:st,thrown:false};}
+  else if(kind==='toss'&&Array.isArray(d.p)){clearAction(ch);ch.action={type:'toss',t:0,P:new V3(d.p[0],LAKE.y,d.p[1]),thrown:false,hand:d.hand==='L'?'L':'R'};}
+  else if(kind==='lantern'&&typeof d.txt==='string'){const L=makeLantern(d.txt.slice(0,40),d.kind==='worry'?'worry':'wish');ch.action={type:'lantern',t:0,L};}}
 function cheersAt(T){if(!T)return;for(let k=0;k<NSEAT;k++){const o=seatOf(T,k).occ,c=T.cups[k];if(o){if(o.action&&o.action.type==='pour')continue;clearAction(o);startDrink(o,c);const g=T.npc&&T.npc.guests.find(x=>x.ch===o);if(g)g.delay=6;}}toast('다 함께 한 모금');lastHud='';}
 $('toastBtn').addEventListener('click',()=>{if(!me.seat)return;cheersAt(me.seat.table);NET.cheers();canvas.focus();});
-$('snackBtn').addEventListener('click',()=>{if(me.seat&&!me.action)startSnack(me);canvas.focus();});
+$('snackBtn').addEventListener('click',()=>{if(me.seat&&!me.action){startSnack(me);NET.act('snack',{});}canvas.focus();});
 $('standBtn').addEventListener('click',()=>{if(me.mode==='boat'){leaveFerry();}else if(me.mode==='gaze')endGaze();else if(me.mode==='rail')endRail();else standMe();canvas.focus();});
 function canGaze(){if(me.mode!=='walk'||me.seat||me.action)return false;return lakeZone();}
 function startGaze(){me.mode='gaze';me.route=[];ring.visible=false;const tx=LAKE.x,tz=LAKE.z;me.ry=Math.atan2(tx-me.x,tz-me.z);setPose(me,'squat');setMode('follow');cam.yaw=me.ry+Math.PI;cam.pitch=.1;cam.dist=3.4;lastHud='';toast('쪼그려 앉아 호수를 바라봐요');}
@@ -2639,12 +2665,12 @@ function frame(){
   for(let i=ripples.length-1;i>=0;i--){const r=ripples[i];r.t+=dt;const q=r.t/1.4;r.m.scale.setScalar(.2+q*1.6);r.m.material.opacity=.55*(1-q);if(q>=1){scene.remove(r.m);ripples.splice(i,1);}}
   for(const m of mists)m.sp.position.x=m.x0+Math.sin(t*.02+m.v*5)*12;
   // camera
-  {const f=cam.mode==='fp'?42:(isTouch?(me.seat&&me.seat.table&&!me.brew?34:62):55);if(Math.abs(camera.fov-f)>.1){camera.fov+=(f-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();}}
+  {const f=cam.mode==='fp'?42:(isTouch?62:55);if(Math.abs(camera.fov-f)>.1){camera.fov+=(f-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();}}
   if(cam.mode==='fp'&&me.brew){fpView(tmpPos,tmpLook);}
   else if(cam.mode==='follow'){
-    const atTable=me.seat&&me.seat.table&&!me.brew,fz=isTouch?.4:0,cx0=atTable?lerp(me.seat.table.cx,me.seat.x,fz):me.x,cz0=atTable?lerp(me.seat.table.cz,me.seat.z,fz):me.z;   // phones: aim between the table centre and your own seat, where the tea set is
+    const atTable=me.seat&&me.seat.table&&!me.brew,fz=0,cx0=atTable?lerp(me.seat.table.cx,me.seat.x,fz):me.x,cz0=atTable?lerp(me.seat.table.cz,me.seat.z,fz):me.z;   // phones: aim between the table centre and your own seat, where the tea set is
     const ty=atTable?.82:me.y+(me.seat||me.mode==='boat'?1.05:1.15);tmpLook.set(cx0,ty,cz0);
-    const cp=Math.cos(cam.pitch);let dist=atTable?(isTouch?Math.max(cam.dist*.5,1.1):Math.max(cam.dist,2.2)):cam.dist;
+    const cp=Math.cos(cam.pitch);let dist=atTable?Math.max(cam.dist,2.2):cam.dist;
     if(inRect(me.x,me.z,ROOM)){const sx=Math.sin(cam.yaw)*cp,sz=Math.cos(cam.yaw)*cp,lim=HALF-.45;
       if(sx>.01)dist=Math.min(dist,(lim-cx0)/sx);if(sx<-.01)dist=Math.min(dist,(-lim-cx0)/sx);if(sz>.01)dist=Math.min(dist,(lim-.4-cz0)/sz);
       dist=Math.min(dist,((atTable?3.4:3.3)-ty)/Math.max(.05,Math.sin(cam.pitch)));dist=Math.max(dist,1.2);}

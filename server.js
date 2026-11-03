@@ -96,6 +96,16 @@ function onMessage(conn, m) {
       broadcast(c, { t: 'serve', ti, tea, ks, by: p.uid });
       broadcast(c, { t: 'table', ...tableState(c, ti) }); break;
     }
+    case 'brewstep': {   // the host's brewing steps, replayed on everyone else's screen
+      if (!p.seat || p.seat[1] !== 0 || !['start','leafing','watering','closing'].includes(m.step)) return;
+      broadcast(c, { t: 'brewstep', ti: p.seat[0], step: m.step, tea: m.step === 'start' ? p.tea : undefined, by: p.uid }, conn.ws); break;
+    }
+    case 'act': {   // a visible action (incense, sweets, offering, stone skipping, feeding, sky lantern) replayed for everyone
+      if (!['incense','snack','offer','skip','toss','lantern'].includes(m.kind)) return;
+      const d = (m.d && typeof m.d === 'object') ? m.d : {}; if (typeof d.txt === 'string') d.txt = d.txt.slice(0, 40);
+      if (JSON.stringify(d).length > 300) return;
+      broadcast(c, { t: 'act', uid: p.uid, kind: m.kind, d }, conn.ws); break;
+    }
     case 'drink': {
       if (!p.seat) return; const [ti, k] = p.seat; c.tables[ti].cups[k] = 0;
       broadcast(c, { t: 'drink', ti, k, uid: p.uid }, conn.ws); break;
