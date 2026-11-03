@@ -2085,7 +2085,7 @@ const NET=(()=>{
   const setStatus=s=>{status=s;info();};
   function shareUrl(){const u=new URL(location.href);u.searchParams.set('server',ch);if(q.get('ws'))u.searchParams.set('ws',q.get('ws'));return u.toString();}
   function out(m){if(ws&&ws.readyState===1)ws.send(JSON.stringify(m));}
-  function myState(){const top=me.seat?me.seat.top:.42,o={x:+me.x.toFixed(2),y:+me.y.toFixed(2),z:+me.z.toFixed(2),ry:+me.ry.toFixed(2),p:me.pose||'stand',st:+top.toFixed(2),m:moving?1:0,v:me.root.visible?1:0};
+  function myState(){const top=me.seat?me.seat.top:.42,o={x:+me.x.toFixed(2),y:+me.y.toFixed(2),z:+me.z.toFixed(2),ry:+me.ry.toFixed(2),p:me.pose||'stand',st:+top.toFixed(2),m:moving?1:0,v:(me.root.visible||me.brew)?1:0};   // brewing hides you only in your own first-person view, never for others
     if(me.mode==='boat'&&me.boat){const g=me.boat.r.g;o.b=[+g.position.x.toFixed(2),+g.position.z.toFixed(2),+g.rotation.y.toFixed(3)];}return o;}
   function avatar(P){if(P.c)return P.c;const c=makeChar(P.look&&P.look.robe?P.look:NPC_LOOKS[0]);c.isRemote=true;scene.add(c.root);P.c=c;P.pose='stand';P.seen=false;setNameTag(c,P.nick);
     if(P.st)applySt(P,P.st,true);else c.root.visible=false;return c;}
