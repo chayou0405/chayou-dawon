@@ -80,6 +80,8 @@ button:disabled{opacity:.5;cursor:default}
 #teaPanel p{margin:0;color:var(--muted);font-size:12.5px}
 .teaList{display:grid;gap:8px}
 .teaItem{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;text-align:left;padding:10px 12px;background:rgba(255,255,255,.04)}
+.teaHave{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.teaSwap{padding:8px 14px;border-color:var(--jade);color:var(--jade);background:rgba(166,201,164,.08);white-space:nowrap}
 .teaItem.on{border-color:var(--jade);background:rgba(166,201,164,.12)}
 .teaItem .sw{width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.25)}
 .teaItem b{display:block;font-size:14.5px;font-family:var(--f-display)}
@@ -172,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0010</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0030</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2235,7 +2237,7 @@ const NET=(()=>{
       if(status!=='connected')return;sendT-=dt;const st=myState(),key=JSON.stringify(st);if(sendT<=0&&(key!==last||sendT<-1.5)){out({t:'st',s:st});last=key;sendT=.1;}},
     mood(e){out({t:'mood',e});},
     others(){return[...members.values()].filter(P=>P.online&&P.c&&P.seen).map(P=>({x:P.tx,z:P.tz,nick:P.nick}));},
-    sit(seat){log('sitReq',{seat:`T${seat.table.i}-${seat.k}`});out({t:'sit',ti:seat.table.i,k:seat.k});},stand(){log('standReq',{});out({t:'stand'});},tea(key){out({t:'tea',key});},
+    sit(seat){log('sitReq',{seat:`T${seat.table.i}-${seat.k}`});out({t:'sit',ti:seat.table.i,k:seat.k});},stand(){log('standReq',{});out({t:'stand'});},tea(key,swap){out({t:'tea',key,swap:!!swap});},
     act(kind,d){out({t:'act',kind,d});},
     brewed(){out({t:'brewed'});},brewStep(step,tea){out({t:'brewstep',step,tea});},drink(){out({t:'drink'});},cupback(){out({t:'cupback'});},cheers(){out({t:'cheers'});},
     get members(){return members;}
@@ -2347,14 +2349,19 @@ $('nightBtn').addEventListener('click',()=>{nightTarget=nightTarget?0:1;$('night
 function nearCabinet(){return inRect(me.x,me.z,ROOM)&&me.z>HALF-2.6&&me.x>CAB.x0-.3&&me.x<CAB.x1+.3;}
 // 을/를 after a tea name, depending on whether its last syllable has a final consonant (용정을, 보이숙차를)
 const eul=w=>{const c=String(w).trim().slice(-1).charCodeAt(0)-0xAC00;return c>=0&&c<11172&&c%28?'을':'를';};
-const INFUSIONS=6;   // per tea from the cabinet: the first brew plus 5 more
-function openTeaPanel(){const list=$('teaList');list.innerHTML='';
-  if(me.tea){const t=TEAS[me.tea];$('teaList').insertAdjacentHTML('beforeend',`<p>지금 ${t.full}${eul(t.full)} 가지고 있어요 (남은 우림 ${me.teaLeft}번). 다 우린 뒤에 새 차를 가져올 수 있어요.</p>`);}
-  for(const k of TEA_KEYS){const t=TEAS[k],b=document.createElement('button');b.type='button';b.className='teaItem'+(me.tea===k?' on':'');b.disabled=!!me.tea;
+const INFUSIONS=3;   // per tea from the cabinet: the first brew plus 2 more
+function openTeaPanel(swap=false){const list=$('teaList');list.innerHTML='';
+  if(me.tea){const t=TEAS[me.tea];
+    if(!swap){list.insertAdjacentHTML('beforeend',`<div class="teaHave"><p>지금 ${t.full}${eul(t.full)} 가지고 있어요 (남은 우림 ${me.teaLeft}번).</p><button type="button" class="teaSwap">찻잎 바꾸기</button></div>`);
+      list.querySelector('.teaSwap').addEventListener('click',()=>{renderTeaList(true);});}
+    else list.insertAdjacentHTML('beforeend',`<p>바꿀 차를 골라 주세요. 가지고 있던 ${t.full}${eul(t.full)} 찻장에 돌려놓고, 새 차로 다시 세 번 우릴 수 있어요.</p>`);}
+  for(const k of TEA_KEYS){const t=TEAS[k],b=document.createElement('button');b.type='button';b.className='teaItem'+(me.tea===k?' on':'');b.disabled=!!me.tea&&(!swap||me.tea===k);
     b.innerHTML=`<i class="sw" style="background:#${t.liquor.toString(16).padStart(6,'0')}"></i><div><b>${t.full}</b><span>${t.han}</span></div>`;
-    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=INFUSIONS;me.brewedAt=null;NET.tea(k);me.route=[];{const out=Math.atan2(-1.1-me.x,CAB.z-me.z)+Math.PI;me.backStep={left:2.25,ry:out,turn:.45};setMode('follow');cam.yaw=out+Math.PI;cam.pitch=.2;}$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}${eul(t.full)} 챙겼어요. 한 번 우리고 다섯 번 더 따를 수 있어요`);canvas.focus();});list.appendChild(b);}
+    b.addEventListener('click',()=>{if(me.tea&&(!swap||me.tea===k))return;const swapped=!!me.tea;me.tea=k;me.teaLeft=INFUSIONS;me.brewedAt=null;NET.tea(k,swapped);me.route=[];{const out=Math.atan2(-1.1-me.x,CAB.z-me.z)+Math.PI;me.backStep={left:2.25,ry:out,turn:.45};setMode('follow');cam.yaw=out+Math.PI;cam.pitch=.2;}$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(swapped?`${t.full}${eul(t.full)} 새로 챙겼어요. 한 번 우리고 두 번 더 따를 수 있어요`:`${t.full}${eul(t.full)} 챙겼어요. 한 번 우리고 두 번 더 따를 수 있어요`);canvas.focus();});list.appendChild(b);}
+  if(swap)return;
   openCabinetDoors();const tok=teaOpenTok=(teaOpenTok||0)+1;setTimeout(()=>{if(tok===teaOpenTok&&nearCabinet())$('teaPanel').hidden=false;},650);}
 let teaOpenTok=0;
+const renderTeaList=swap=>openTeaPanel(swap);   // re-draws the list in place (the cabinet is already open)
 $('teaClose').addEventListener('click',()=>{$('teaPanel').hidden=true;closeCabinetDoors();canvas.focus();});
 const scoop=new THREE.Mesh((()=>{const sh=new THREE.Shape();sh.absarc(0,0,.019,Math.PI,Math.PI*2,false);sh.lineTo(.0135,0);sh.absarc(0,0,.0135,0,-Math.PI,true);sh.lineTo(-.019,0);
   const g=new THREE.ExtrudeGeometry(sh,{depth:.11,bevelEnabled:true,bevelThickness:.0015,bevelSize:.0012,bevelSegments:1,curveSegments:14});g.rotateY(-Math.PI/2);return g;})(),M(0xb39a5e,{side:THREE.DoubleSide}));scoop.visible=false;scoop.layers.set(1);scene.add(scoop);

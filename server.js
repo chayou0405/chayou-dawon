@@ -15,7 +15,7 @@ const CAP = +process.env.CAP || 88;            // per channel, hosts and guests 
 const GRACE = +process.env.GRACE_MS || 90000;   // a dropped connection keeps its character, name and seat this long (phones in the background)
 const LEAVE_MS = +process.env.LEAVE_MS || 6000;   // after the page says goodbye, the character leaves this soon unless a reload brings it back
 const LOG = process.env.DEBUG_LOG !== '0';     // dev log to stdout (server console only, never shown to players)
-const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 6, SIPS = 3;   // one brew + 5 more; a poured cup is three sips
+const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 3, SIPS = 3;   // one brew + 2 more; a poured cup is three sips
 const ROOT = __dirname;
 
 const A = ['살랑','소담','몽글','포근','고요한','느린','여린','은은한','잔잔한','다정한','따스한','아늑한'];
@@ -106,9 +106,11 @@ function onMessage(conn, m) {
       broadcast(c, { t: 'st', uid: p.uid, s: p.st, q: p.stq }, conn.ws); break;
     }
     case 'tea': {  // picked a tea at the cabinet
-      if (p.tea && p.teaLeft > 0) return send(conn.ws, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
+      if (p.tea && p.teaLeft > 0 && !m.swap) return send(conn.ws, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
+      if (m.swap && p.seat && p.seat[1] === 0) { const T = c.tables[p.seat[0]]; T.brewed = false; T.ready = false; }   // a host with a new tea brews it fresh
       if (typeof m.key !== 'string' || m.key.length > 24) return;
-      p.tea = m.key; p.teaLeft = Math.max(1, Math.min(INFUSIONS, (m.left | 0) || INFUSIONS)); p.brewedAt = null;
+      p.tea = m.key; p.teaLeft = m.swap ? INFUSIONS : Math.max(1, Math.min(INFUSIONS, (m.left | 0) || INFUSIONS)); p.brewedAt = null;
+      L('tea', { uid: p.uid, ch: c.id, key: m.key, swap: !!m.swap });
       broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: null }); break;
     }
     case 'sit': {
