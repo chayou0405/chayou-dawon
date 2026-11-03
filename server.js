@@ -12,8 +12,9 @@ const http = require('http'), crypto = require('crypto'), fs = require('fs'), pa
 
 const PORT = +process.env.PORT || 8080;
 const CAP = +process.env.CAP || 88;            // per channel, hosts and guests included
-const GRACE = +process.env.GRACE_MS || 30000;   // a dropped connection keeps its name/seat this long
-const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 6;   // one brew + 5 more
+const GRACE = +process.env.GRACE_MS || 90000;   // a dropped connection keeps its character, name and seat this long (phones in the background)
+const LOG = process.env.DEBUG_LOG !== '0';     // dev log to stdout (server console only, never shown to players)
+const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 6, SIPS = 3;   // one brew + 5 more; a poured cup is three sips
 const ROOT = __dirname;
 
 const A = ['살랑','소담','몽글','포근','고요한','느린','여린','은은한','잔잔한','다정한','따스한','아늑한'];
@@ -21,36 +22,44 @@ const B = ['구름','이슬','바람','달빛','잎새','여울','윤슬','꽃�
 const NICKS = A.flatMap(a => B.map(b => a + b));   // 144
 
 const channels = new Map();
+let cidSeq = 0;
+// dev log: one line per lifecycle event with user id, connection id, server(channel) id and seat
+function L(ev, o) { if (LOG) console.log(new Date().toISOString().slice(11, 23), ev, JSON.stringify(o)); }
+const seatId = s => s ? `T${s[0]}-${s[1]}` : null;
 function channel(id) {
   let c = channels.get(id);
   if (!c) {
-    c = { id, players: new Map(), bySid: new Map(),
+    c = { id, players: new Map(), bySid: new Map(), retired: new Map(), ver: 0,
       seats: Array.from({ length: NTABLES }, () => Array(NSEAT).fill(null)),
+      seatVer: Array.from({ length: NTABLES }, () => Array(NSEAT).fill(0)),   // version of each seat's last change: clients drop older updates
       tables: Array.from({ length: NTABLES }, () => ({ tea: null, ready: false, brewed: false, cups: Array(NSEAT).fill(0) })) };
     channels.set(id, c);
   }
   return c;
 }
 const occupancy = c => c.players.size;   // online players + players inside their reconnect grace window
-const pub = p => ({ uid: p.uid, nick: p.nick, look: p.look, st: p.st, online: p.online, seat: p.seat, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
-const tableState = (c, ti) => ({ ti, tea: c.tables[ti].tea, ready: c.tables[ti].ready, cups: c.tables[ti].cups, seats: c.seats[ti] });
+const pub = p => ({ uid: p.uid, nick: p.nick, look: p.look, st: p.st, q: p.stq, online: p.online, seat: p.seat, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
+const tableState = (c, ti) => ({ ti, tea: c.tables[ti].tea, ready: c.tables[ti].ready, cups: c.tables[ti].cups, seats: c.seats[ti], sv: c.seatVer[ti] });
+// every seat change goes through here: one owner per seat, decided only by the server, stamped with a version
+function setSeat(c, ti, k, uid) { c.seats[ti][k] = uid; const v = c.seatVer[ti][k] = ++c.ver; broadcast(c, { t: 'seat', ti, k, uid, v }); return v; }
 
 function send(ws, m) { if (ws && ws.readyState === 1) wsSend(ws, JSON.stringify(m)); }
-function broadcast(c, m, except) { const s = JSON.stringify(m); for (const p of c.players.values()) if (p.online && p.ws !== except) wsSend(p.ws, s); }
+function broadcast(c, m, except) { const s = JSON.stringify(m); for (const p of c.players.values()) if (p.online && p.ws && p.ws !== except) wsSend(p.ws, s); }
 
 function freeSeat(c, p) {
   if (!p.seat) return;
   const [ti, k] = p.seat;
   if (c.seats[ti][k] === p.uid) {
-    c.seats[ti][k] = null;
     if (k > 0) c.tables[ti].cups[k] = 0;
     if (k === 0) { c.tables[ti].ready = false; c.tables[ti].brewed = false; }
-    broadcast(c, { t: 'seat', ti, k, uid: null });
+    setSeat(c, ti, k, null); L('stand', { uid: p.uid, ch: c.id, seat: seatId(p.seat) });
   }
   p.seat = null;
 }
-function removePlayer(c, p) {
+function removePlayer(c, p, why) {
+  L('remove', { uid: p.uid, ch: c.id, why, seat: seatId(p.seat) });
   freeSeat(c, p); c.players.delete(p.uid); c.bySid.delete(p.sid);
+  c.retired.set(p.sid, { uid: p.uid, nick: p.nick, t: Date.now() });   // the same session coming back much later gets its id and name again
   broadcast(c, { t: 'leave', uid: p.uid });
   if (!c.players.size) channels.delete(c.id);
 }
@@ -59,12 +68,14 @@ function onMessage(conn, m) {
   if (!m || typeof m.t !== 'string') return;
   if (m.t === 'hello') return hello(conn, m);
   const c = conn.c, p = conn.p; if (!c || !p) return;
+  if (p.ws !== conn.ws) return;   // a replaced, older connection of this session: its late messages must not touch the current state
   switch (m.t) {
     case 'st': {   // position, facing, pose
       const s = m.s || {}; const num = v => (typeof v === 'number' && isFinite(v)) ? v : 0;
       p.st = { x: num(s.x), y: num(s.y), z: num(s.z), ry: num(s.ry), p: ['stand','sit','squat'].includes(s.p) ? s.p : 'stand', st: num(s.st) || .42, m: s.m ? 1 : 0, v: s.v === 0 ? 0 : 1 };
       if (Array.isArray(s.b) && s.b.length === 3) p.st.b = s.b.map(num);   // raft pose while riding
-      broadcast(c, { t: 'st', uid: p.uid, s: p.st }, conn.ws); break;
+      p.stq = (p.stq || 0) + 1;   // order stamp: a client ignores any position older than the one it already has
+      broadcast(c, { t: 'st', uid: p.uid, s: p.st, q: p.stq }, conn.ws); break;
     }
     case 'tea': {  // picked a tea at the cabinet
       if (p.tea && p.teaLeft > 0) return send(conn.ws, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
@@ -76,17 +87,20 @@ function onMessage(conn, m) {
       const ti = m.ti | 0, k = m.k | 0;
       if (ti < 0 || ti >= NTABLES || k < 0 || k >= NSEAT) return;
       const holder = c.seats[ti][k];
-      if (holder && holder !== p.uid) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'taken' });
-      if (k === 0 && holder !== p.uid && !(p.tea && p.teaLeft > 0)) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'noTea' });   // keeps a host who already sits there   // 팽주석 needs a tea from the cabinet
+      // Node runs this handler to completion before the next message, so two people asking for one seat at once
+      // are decided here one after the other: the first gets it, the second is told it is taken
+      if (holder && holder !== p.uid) { L('sitDenied', { uid: p.uid, cid: conn.cid, ch: c.id, seat: seatId([ti, k]), holder }); return send(conn.ws, { t: 'seatDenied', ti, k, why: 'taken', holder, v: c.seatVer[ti][k] }); }
+      if (k === 0 && holder !== p.uid && !(p.tea && p.teaLeft > 0)) { L('sitDenied', { uid: p.uid, ch: c.id, seat: seatId([ti, k]), why: 'noTea' }); return send(conn.ws, { t: 'seatDenied', ti, k, why: 'noTea' }); }   // 팽주석 needs a tea from the cabinet (a host who already sits there keeps it)
+      if (holder === p.uid) { send(conn.ws, { t: 'seat', ti, k, uid: p.uid, v: c.seatVer[ti][k] }); break; }   // already mine: just confirm
       if (p.seat && (p.seat[0] !== ti || p.seat[1] !== k)) freeSeat(c, p);
-      c.seats[ti][k] = p.uid; p.seat = [ti, k];
+      p.seat = [ti, k];
       if (k === 0) c.tables[ti].tea = p.tea;
-      broadcast(c, { t: 'seat', ti, k, uid: p.uid });
+      setSeat(c, ti, k, p.uid); L('sit', { uid: p.uid, cid: conn.cid, ch: c.id, seat: seatId(p.seat) });
       broadcast(c, { t: 'table', ...tableState(c, ti) });
       // a new guest at a table whose host has already brewed gets a cup straight away
       const hostUid = c.seats[ti][0], T = c.tables[ti];
       if (k > 0 && hostUid && hostUid !== p.uid && T.brewed && !T.cups[k]) {
-        T.cups[k] = 1;
+        T.cups[k] = SIPS;
         setTimeout(() => { if (c.seats[ti][k] === p.uid && c.seats[ti][0] === hostUid) broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid }); }, 1200);
       } else if (k > 0 && hostUid && hostUid !== p.uid && !T.brewed) {
         const h = c.players.get(hostUid); if (h) send(h.ws, { t: 'newGuest', ti, k });
@@ -100,7 +114,7 @@ function onMessage(conn, m) {
       T.tea = p.tea; T.ready = true; T.brewed = true; p.teaLeft -= 1; p.brewedAt = ti; const tea = p.tea; if (p.teaLeft <= 0) { p.tea = null; p.brewedAt = null; }
       broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
       // pouring follows immediately: every seated guest gets a full cup
-      const ks = []; for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) { T.cups[k] = 1; ks.push(k); }
+      const ks = []; for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) { T.cups[k] = SIPS; ks.push(k); }
       T.ready = false;
       broadcast(c, { t: 'serve', ti, tea, ks, by: p.uid });
       broadcast(c, { t: 'table', ...tableState(c, ti) }); break;
@@ -116,7 +130,7 @@ function onMessage(conn, m) {
       broadcast(c, { t: 'act', uid: p.uid, kind: m.kind, d }, conn.ws); break;
     }
     case 'drink': {
-      if (!p.seat) return; const [ti, k] = p.seat; c.tables[ti].cups[k] = 0;
+      if (!p.seat) return; const [ti, k] = p.seat; c.tables[ti].cups[k] = Math.max(0, (c.tables[ti].cups[k] | 0) - 1);   // one sip
       broadcast(c, { t: 'drink', ti, k, uid: p.uid }, conn.ws); break;
     }
     case 'cupback': {
@@ -125,7 +139,7 @@ function onMessage(conn, m) {
     }
     case 'cheers': {   // 함께 한 모금: everyone at that table drinks together
       if (!p.seat) return; const ti = p.seat[0];
-      for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) c.tables[ti].cups[k] = 0;
+      for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) c.tables[ti].cups[k] = Math.max(0, (c.tables[ti].cups[k] | 0) - 1);
       broadcast(c, { t: 'cheers', ti, by: p.uid }); break;
     }
     case 'mood': if (typeof m.e === 'string' && m.e.length <= 8) broadcast(c, { t: 'mood', uid: p.uid, e: m.e }, conn.ws); break;
@@ -142,11 +156,16 @@ function hello(conn, m) {
   const back = typeof m.sid === 'string' && c.bySid.get(m.sid);
   let p = back && c.players.get(back);
   if (p) {
-    clearTimeout(p.graceTimer); if (p.online && p.ws !== conn.ws) { try { p.ws.close(); } catch (e) {} }
-    p.ws = conn.ws; p.online = true; if (m.look && typeof m.look === 'object') p.look = m.look;
+    clearTimeout(p.graceTimer); p.graceTimer = null;
+    const wasOnline = p.online;
+    if (p.online && p.ws !== conn.ws) {   // the session's older connection is still open (a half-dead socket, or the same session in another tab)
+      send(p.ws, { t: 'replaced' }); const old = p.ws; p.ws = null; try { old.close(); } catch (e) {}
+    }
+    p.ws = conn.ws; p.online = true; p.cid = conn.cid; if (m.look && typeof m.look === 'object') p.look = m.look;
     conn.c = c; conn.p = p;
-    send(conn.ws, { t: 'welcome', resumed: true, uid: p.uid, sid: p.sid, nick: p.nick, ch: id, cap: CAP, me: pub(p), players: [...c.players.values()].filter(q => q !== p).map(pub), tables: c.tables.map((_, ti) => tableState(c, ti)) });
-    broadcast(c, { t: 'back', p: pub(p) }, conn.ws);
+    L(wasOnline ? 'takeover' : 'resume', { uid: p.uid, cid: conn.cid, ch: id, seat: seatId(p.seat), inst: m.inst });
+    send(conn.ws, { t: 'welcome', resumed: true, cid: conn.cid, uid: p.uid, sid: p.sid, nick: p.nick, ch: id, cap: CAP, v: c.ver, me: pub(p), players: [...c.players.values()].filter(q => q !== p).map(pub), tables: c.tables.map((_, ti) => tableState(c, ti)) });
+    if (!wasOnline) broadcast(c, { t: 'back', p: pub(p) }, conn.ws);
     return;
   }
   if (occupancy(c) >= CAP) {
@@ -155,19 +174,29 @@ function hello(conn, m) {
     return send(conn.ws, { t: 'full', ch: id, count: occupancy(c), cap: CAP, alt });
   }
   const used = new Set([...c.players.values()].map(q => q.nick));
+  for (const [k, r] of c.retired) if (Date.now() - r.t > 30 * 60000) c.retired.delete(k);
+  const old = typeof m.sid === 'string' && c.retired.get(m.sid);   // this session was here before its grace ran out
   const free = NICKS.filter(n => !used.has(n));
-  const nick = free[crypto.randomInt(free.length)];
-  p = { uid: crypto.randomUUID(), sid: crypto.randomBytes(18).toString('base64url'), nick, look: (m.look && typeof m.look === 'object') ? m.look : {}, st: null,
-    ws: conn.ws, online: true, graceTimer: null, seat: null, tea: null, teaLeft: 0, brewedAt: null };
+  const nick = old && !used.has(old.nick) ? old.nick : free[crypto.randomInt(free.length)];
+  const sid = old ? m.sid : crypto.randomBytes(18).toString('base64url');
+  if (old) c.retired.delete(m.sid);
+  p = { uid: old ? old.uid : crypto.randomUUID(), sid, nick, look: (m.look && typeof m.look === 'object') ? m.look : {}, st: null, stq: 0,
+    ws: conn.ws, cid: conn.cid, online: true, graceTimer: null, seat: null, tea: null, teaLeft: 0, brewedAt: null };
   c.players.set(p.uid, p); c.bySid.set(p.sid, p.uid); conn.c = c; conn.p = p;
-  send(conn.ws, { t: 'welcome', resumed: false, uid: p.uid, sid: p.sid, nick, ch: id, cap: CAP, me: pub(p), players: [...c.players.values()].filter(q => q !== p).map(pub), tables: c.tables.map((_, ti) => tableState(c, ti)) });
+  L('enter', { uid: p.uid, cid: conn.cid, ch: id, nick, returning: !!old, inst: m.inst });
+  send(conn.ws, { t: 'welcome', resumed: false, cid: conn.cid, uid: p.uid, sid: p.sid, nick, ch: id, cap: CAP, v: c.ver, me: pub(p), players: [...c.players.values()].filter(q => q !== p).map(pub), tables: c.tables.map((_, ti) => tableState(c, ti)) });
   broadcast(c, { t: 'enter', p: pub(p) }, conn.ws);
 }
 
 function onClose(conn) {
-  const c = conn.c, p = conn.p; if (!c || !p || p.ws !== conn.ws) return;
-  p.online = false; broadcast(c, { t: 'away', uid: p.uid });
-  p.graceTimer = setTimeout(() => removePlayer(c, p), GRACE);   // name and seat stay reserved during the grace window
+  const c = conn.c, p = conn.p;
+  if (!c || !p) return;
+  // a late close from a connection this session has already replaced must not touch the new connection's character or seat
+  if (p.ws !== conn.ws) { L('closeStale', { uid: p.uid, cid: conn.cid, current: p.cid, ch: c.id }); return; }
+  p.online = false; p.ws = null; L('away', { uid: p.uid, cid: conn.cid, ch: c.id, seat: seatId(p.seat), graceMs: GRACE });
+  broadcast(c, { t: 'away', uid: p.uid });
+  // character, name and seat stay during the grace window; only its end (or a real leave) clears them
+  p.graceTimer = setTimeout(() => { if (!p.online && c.players.get(p.uid) === p) removePlayer(c, p, 'graceExpired'); }, GRACE);
 }
 
 /* ---------- static files ---------- */
@@ -189,7 +218,8 @@ server.on('upgrade', (req, sock) => {
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
   sock.setNoDelay(true);
   const ws = { sock, readyState: 1, close() { if (this.readyState !== 1) return; this.readyState = 3; try { sock.write(Buffer.from([0x88, 0])); sock.end(); } catch (e) {} } };
-  const conn = { ws, c: null, p: null, alive: true };
+  const conn = { ws, c: null, p: null, alive: true, cid: ++cidSeq };
+  L('connect', { cid: conn.cid });
   let buf = Buffer.alloc(0);
   sock.on('data', d => {
     buf = Buffer.concat([buf, d]);

@@ -177,7 +177,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2100</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2230</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -1638,7 +1638,8 @@ function clearAction(ch){const a=ch.action;if(!a)return;
   else if(a.type==='pour'&&a.T){const T=a.T;T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;}
   ch.action=null;ch.headPivot.rotation.x=0;}
 function startPour(ch,T){clearAction(ch);ch.action={type:'pour',t:0,dur:6.2,T};T.busy=true;}
-function startDrink(ch,cup){clearAction(ch);ch.action={type:'drink',t:0,dur:4.9,cup};}
+const SIPS=3;   // one poured cup is drunk in three sips
+function startDrink(ch,cup){clearAction(ch);const from=cup.level,to=Math.max(0,Math.round((from-1/SIPS)*SIPS)/SIPS);ch.action={type:'drink',t:0,dur:4.9,cup,from,to};}
 function startTap(ch,cup){if(ch.action)return;ch.action={type:'tap',t:0,dur:2.3,T:cup.T,cup};}
 const INCENSE_POS=new V3(.47,0,.5);
 // the censer goes in front of whoever lights it, in the clearest free spot near their place
@@ -1722,7 +1723,7 @@ function updateAction(ch,dt){
     const sup=raise*(1-lower);const lt=lapL.clone().lerp(palm.clone().addScaledVector(right,.05).add(new V3(0,-.01,0)),sup*.85);ik(L,lt,poleW(ch,1,_p2));
     toTableLocal(T,cupW,cup.g.position);
     cup.g.quaternion.setFromAxisAngle(right.clone().applyAxisAngle(YAX,-T.rot),ang);
-    if(sip>0&&lower<=0){cup.level=Math.min(cup.level,1-sip);}
+    if(sip>0&&lower<=0){cup.level=Math.min(cup.level,lerp(a.from??1,a.to??0,sip));}
     ch.headPivot.rotation.x=-.12*sip*(1-lower);
     if(t>=a.dur){ch.action=null;cup.g.quaternion.identity();cup.g.position.copy(cup.rest);ch.headPivot.rotation.x=0;}
   }else if(a.type==='tap'){
@@ -2076,8 +2077,19 @@ const NET=(()=>{
   const URL_WS=(q.get('ws')||metaUrl||sameHost).trim();
   let ch=(q.get('server')||'1').replace(/[^0-9a-z-]/gi,'').slice(0,16)||'1';
   const KEY='chayou-sid:';
-  const store={get(){try{return sessionStorage.getItem(KEY+ch);}catch(e){return null;}},set(v){try{sessionStorage.setItem(KEY+ch,v);}catch(e){}}};
-  let ws=null,status='idle',uid=null,nick=null,cap=88,started=false,retry=0,retryT=null,pingT=null,sendT=0,last='',moving=false;
+  const store={get(){try{return sessionStorage.getItem(KEY+ch);}catch(e){return null;}},set(v){try{sessionStorage.setItem(KEY+ch,v);}catch(e){}},clear(){try{sessionStorage.removeItem(KEY+ch);}catch(e){}}};
+  let replacedBy=false,ws=null,status='idle',uid=null,nick=null,cap=88,started=false,retry=0,retryT=null,pingT=null,sendT=0,last='',moving=false,cid=null,nConn=0;
+  // dev log: only with ?debug in the link (or localStorage chayou-debug=1). Goes to window.__chayouLog and console.debug, never on screen.
+  const DEV=q.has('debug')||(()=>{try{return localStorage.getItem('chayou-debug')==='1';}catch(e){return false;}})();
+  const logBuf=[];if(DEV)window.__chayouLog=logBuf;
+  function log(ev,o={}){if(!DEV)return;const r={t:+(performance.now()/1000).toFixed(2),ev,me:uid&&uid.slice(0,8),cid,ch,...o};logBuf.push(r);if(logBuf.length>3000)logBuf.shift();try{console.debug('[chayou]',ev,JSON.stringify(o));}catch(e){}}
+  const INST=Math.random().toString(36).slice(2,10);   // this page load (a duplicated tab gets its own)
+  // a duplicated browser tab copies sessionStorage, so two live tabs would share one session and keep taking the
+  // character from each other. Before using a stored session, ask the other open tabs whether one of them is using it.
+  let bc=null,dupSeen=false;try{bc=new BroadcastChannel('chayou-tabs');}catch(e){}
+  if(bc)bc.onmessage=e=>{const d=e.data||{};if(d.q==='who'&&d.inst!==INST&&d.sid&&d.sid===store.get()&&uid)bc.postMessage({a:'mine',to:d.inst});if(d.a==='mine'&&d.to===INST)dupSeen=true;};
+  const short=u=>u?String(u).slice(0,8):null;
+  const seatV=new Map(),holders=new Map();   // "ti-k" -> last applied seat version / holder uid, as the server decided
   const members=new Map();   // uid -> {uid,nick,look,c,tx,ty,tz,try,pose,m,seen,online,seat}
   const info=()=>{const el=$('netInfo');if(!el)return;const n=[...members.values()].filter(M=>M.online).length+1;
     el.textContent=status==='connected'?`${ch}채널 · ${n}/${cap}`:status==='connecting'?`접속 중… · ${ch}채널`:status==='reconnecting'?`재연결 중… · ${ch}채널`:status==='full'?`${ch}채널 만원 · ${cap}/${cap}`:status==='noserver'?'서버 미설정 · 혼자 보는 중':status==='failed'?'연결 실패 · 혼자 보는 중':'';
@@ -2088,40 +2100,75 @@ const NET=(()=>{
   function myState(){const top=me.seat?me.seat.top:.42,o={x:+me.x.toFixed(2),y:+me.y.toFixed(2),z:+me.z.toFixed(2),ry:+me.ry.toFixed(2),p:me.pose||'stand',st:+top.toFixed(2),m:moving?1:0,v:(me.root.visible||me.brew)?1:0};   // brewing hides you only in your own first-person view, never for others
     if(me.mode==='boat'&&me.boat){const g=me.boat.r.g;o.b=[+g.position.x.toFixed(2),+g.position.z.toFixed(2),+g.rotation.y.toFixed(3)];}return o;}
   function avatar(P){if(P.c)return P.c;const c=makeChar(P.look&&P.look.robe?P.look:NPC_LOOKS[0]);c.isRemote=true;scene.add(c.root);P.c=c;P.pose='stand';P.seen=false;setNameTag(c,P.nick);
+    log('avatarCreate',{uid:short(P.uid),nick:P.nick});
     if(P.st)applySt(P,P.st,true);else c.root.visible=false;return c;}
-  function applySt(P,s,snap){P.tx=s.x;P.ty=s.y;P.tz=s.z;P.try=s.ry;P.m=s.m;P.b=Array.isArray(s.b)?s.b:null;const c=P.c;if(!c)return;c.root.visible=!!s.v;
+  // where a seated character sits: the same spot seatChar() uses for the local player, so every screen agrees
+  function seatPose(s){const fo=s.table?.04:.17;return{x:s.x+Math.sin(s.ry)*fo,y:0,z:s.z+Math.cos(s.ry)*fo,ry:s.ry};}
+  function placeSeated(P,snap){const s=P.seat,c=P.c;if(!s||!c)return;const t=seatPose(s);P.tx=t.x;P.ty=t.y;P.tz=t.z;P.try=t.ry;P.m=0;
+    // far away (just sat down from across the room, or first seen): jump straight to the seat instead of gliding through the floor
+    if(snap||!P.seen||Math.hypot(c.x-t.x,c.z-t.z)>1.2||Math.abs(c.y-t.y)>.3){P.seen=true;c.x=t.x;c.y=t.y;c.z=t.z;c.ry=t.ry;c.root.position.set(c.x,c.y,c.z);}
+    c.root.visible=true;if(P.pose!=='sit'){P.pose='sit';setPose(c,'sit',s.top);}}
+  function applySt(P,s,snap,q){
+    if(q!=null){if(P.q!=null&&q<=P.q){log('stStale',{uid:short(P.uid),q,have:P.q});return;}P.q=q;}   // an older position never overwrites a newer one
+    P.b=Array.isArray(s.b)?s.b:null;const c=P.c;
+    if(P.seat){P.st=s;if(c)placeSeated(P,false);return;}   // seated: the seat decides where the character is, not position packets
+    P.tx=s.x;P.ty=s.y;P.tz=s.z;P.try=s.ry;P.m=s.m;if(!c)return;c.root.visible=!!s.v;
     if(snap||!P.seen){P.seen=true;c.x=s.x;c.y=s.y;c.z=s.z;c.ry=s.ry;c.root.position.set(c.x,c.y,c.z);}
     if(s.p!==P.pose){P.pose=s.p;setPose(c,s.p==='squat'?'squat':s.p==='sit'?'sit':'stand',s.st);}}
-  function drop(P){if(P.raft)P.raft.g.visible=false;if(P.c){scene.remove(P.c.root);if(P.c.bubble){scene.remove(P.c.bubble.sp);P.c.bubble=null;}}
+  function drop(P,why){log('avatarDelete',{uid:short(P.uid),nick:P.nick,why,seat:P.seat?`T${P.seat.table.i}-${P.seat.k}`:null});
+    if(P.raft)P.raft.g.visible=false;if(P.c){scene.remove(P.c.root);if(P.c.bubble){scene.remove(P.c.bubble.sp);P.c.bubble=null;}}
     for(const s of seats)if(s.occ&&s.occ===P.c)s.occ=null;members.delete(P.uid);}
   function seatAt(ti,k){const T=tables[ti];return T&&seatOf(T,k);}
-  function applySeat(ti,k,who){const s=seatAt(ti,k);if(!s)return;if(k===0&&!who)endRemoteBrew(ti);
-    if(who===uid){return;}
-    if(s.occ&&s.occ.isRemote)s.occ=null;
-    const P=who&&members.get(who);if(P){avatar(P);s.occ=P.c;P.c.seat=s;}
-    else if(s.occ&&s.occ!==me)s.occ=null;}
-  function upsert(p){let P=members.get(p.uid);if(!P){P={uid:p.uid};members.set(p.uid,P);}P.nick=p.nick;P.look=p.look;P.online=p.online!==false;
-    avatar(P);if(p.st)applySt(P,p.st,!P.seen);return P;}   // someone briefly offline keeps standing where they were until they really leave
+  // the local player loses a seat the server gave to someone else (or never gave): stand up beside it
+  function unseatMe(s,why){if(me.seat!==s)return;log('unseatMe',{seat:`T${s.table.i}-${s.k}`,why});s.occ=null;me.seat=null;setPose(me,'stand');me.x=s.x-Math.sin(s.ry)*.6;me.z=s.z-Math.cos(s.ry)*.6;me.y=0;lastHud='';}
+  // seat ownership comes only from the server; v is the server's version of that seat (older updates are dropped)
+  function applySeat(ti,k,who,v){const s=seatAt(ti,k);if(!s)return;const key=ti+'-'+k;
+    if(v!=null){const have=seatV.get(key)||0;if(v<have){log('seatStale',{seat:'T'+key,v,have});return;}seatV.set(key,v);}
+    const prev=holders.get(key)||null;holders.set(key,who||null);
+    if(prev!==(who||null))log('seat',{seat:'T'+key,uid:short(who),prev:short(prev),v});
+    if(k===0&&!who)endRemoteBrew(ti);
+    if(prev&&prev!==who){const Q=members.get(prev);if(Q&&Q.seat===s){Q.seat=null;if(Q.c)Q.c.seat=null;}}
+    if(s.occ&&s.occ!==me&&!(who&&members.get(who)&&members.get(who).c===s.occ))s.occ=null;
+    if(who===uid){if(me.seat===s)s.occ=me;return;}
+    if(who&&me.seat===s)unseatMe(s,'heldBy:'+short(who));
+    const P=who&&members.get(who);
+    if(P){if(P.seat&&P.seat!==s&&P.seat.occ===P.c)P.seat.occ=null;avatar(P);P.seat=s;s.occ=P.c;P.c.seat=s;placeSeated(P,false);}
+    else if(!who&&s.occ&&s.occ!==me)s.occ=null;}
+  // full snapshot (welcome) vs. partial updates: only a full snapshot may remove someone who is not listed
+  function upsert(p,full){let P=members.get(p.uid);if(!P){P={uid:p.uid};members.set(p.uid,P);}P.nick=p.nick;P.look=p.look;P.online=p.online!==false;
+    if(full||p.q!=null)P.q=p.q!=null?p.q:P.q;   // snapshot order stamp
+    avatar(P);if(p.st){if(P.seat)P.st=p.st;else applySt(P,p.st,!P.seen);}return P;}   // someone briefly offline keeps their character and seat until they really leave
+  function restoreSeat(s){   // this page was reloaded (or reconnected) while the server still holds our seat: sit back down quietly
+    if(me.seat===s||me.mode!=='walk'||me.brew)return;if(me.seat)me.seat.occ=null;seatChar(me,s);me.route=[];me.seatTarget=null;ring.visible=false;
+    cam.yaw=Math.atan2(s.x-s.table.cx,s.z-s.table.cz)+.78;cam.pitch=.34;cam.dist=3.0;lastHud='';log('restoreSeat',{seat:`T${s.table.i}-${s.k}`});}
   function onMsg(m){
     switch(m.t){
-      case 'welcome':{uid=m.uid;nick=m.nick;cap=m.cap||88;ch=m.ch;store.set(m.sid);retry=0;
+      case 'welcome':{uid=m.uid;nick=m.nick;cap=m.cap||88;ch=m.ch;cid=m.cid;store.set(m.sid);retry=0;
+        log('welcome',{resumed:!!m.resumed,uid:short(m.uid),nick:m.nick,players:m.players.length,serverSeat:m.me&&m.me.seat?`T${m.me.seat[0]}-${m.me.seat[1]}`:null,localSeat:me.seat?`T${me.seat.table.i}-${me.seat.k}`:null});
         history.replaceState(null,'',shareUrl());
-        {const keep=new Set(m.players.map(p=>p.uid));for(const P of [...members.values()])if(!keep.has(P.uid))drop(P);}   // reconcile, don't rebuild
-        for(const p of m.players)upsert(p);
-        m.tables.forEach(tb=>tb.seats.forEach((who,k)=>applySeat(tb.ti,k,who)));
+        // full state: this is the only message that may remove characters that are not listed
+        {const keep=new Set(m.players.map(p=>p.uid));for(const P of [...members.values()])if(!keep.has(P.uid))drop(P,'notInSnapshot');}   // reconcile, don't rebuild
+        seatV.clear();holders.clear();for(const P of members.values())P.seat=null;
+        for(const p of m.players)upsert(p,true);
+        m.tables.forEach(tb=>tb.seats.forEach((who,k)=>applySeat(tb.ti,k,who,tb.sv?tb.sv[k]:null)));
         if(m.me&&m.me.tea){me.tea=m.me.tea;me.teaLeft=m.me.teaLeft;me.brewedAt=m.me.brewedAt!=null?m.me.brewedAt:null;}else if(me.tea&&me.teaLeft>0)out({t:'tea',key:me.tea,left:me.teaLeft});
-        if(m.resumed&&m.me&&m.me.seat&&!me.seat)out({t:'stand'});   // this page starts standing; let go of the old seat
-        if(me.seat)out({t:'sit',ti:me.seat.table.i,k:me.seat.k});
+        {const sv=m.me&&m.me.seat&&seatAt(m.me.seat[0],m.me.seat[1]);
+          if(me.seat)out({t:'sit',ti:me.seat.table.i,k:me.seat.k});   // keep (or re-claim) the seat this page is sitting on
+          else if(sv)restoreSeat(sv);}   // the server still holds a seat for this session: sit back there
         setNameTag(me,nick);setStatus('connected');last='';
         if(!m.resumed)toast(`${nick} 님, ${ch}채널에 들어왔어요`);break;}
       case 'full':{cap=m.cap||cap;setStatus('full');showFull(m);try{ws.close();}catch(e){}break;}
-      case 'enter':case 'back':{upsert(m.p);if(m.p.seat)applySeat(m.p.seat[0],m.p.seat[1],m.p.uid);info();break;}
-      case 'away':{const P=members.get(m.uid);if(P)P.online=false;info();break;}
-      case 'leave':{const P=members.get(m.uid);if(P)drop(P);info();break;}
-      case 'st':{const P=members.get(m.uid);if(P){if(!P.c)avatar(P);applySt(P,m.s,false);}break;}
-      case 'seat':applySeat(m.ti,m.k,m.uid);break;
-      case 'seatDenied':{const s=seatAt(m.ti,m.k);if(s&&me.seat===s&&m.why!=='noTea'){s.occ=null;me.seat=null;setPose(me,'stand');me.x=s.x-Math.sin(s.ry)*.6;me.z=s.z-Math.cos(s.ry)*.6;me.y=0;lastHud='';}
+      case 'enter':case 'back':{log(m.t,{uid:short(m.p.uid),nick:m.p.nick,seat:m.p.seat?`T${m.p.seat[0]}-${m.p.seat[1]}`:null,known:members.has(m.p.uid)});
+        upsert(m.p);if(m.p.seat)applySeat(m.p.seat[0],m.p.seat[1],m.p.uid);info();break;}
+      case 'away':{const P=members.get(m.uid);log('away',{uid:short(m.uid),seat:P&&P.seat?`T${P.seat.table.i}-${P.seat.k}`:null});if(P)P.online=false;info();break;}   // keeps character and seat
+      case 'leave':{const P=members.get(m.uid);if(P)drop(P,'leave');info();break;}
+      case 'st':{const P=members.get(m.uid);if(P){if(!P.c)avatar(P);applySt(P,m.s,false,m.q);}break;}   // a partial update: never creates or removes anyone else
+      case 'seat':applySeat(m.ti,m.k,m.uid,m.v);break;
+      case 'seatDenied':{const s=seatAt(m.ti,m.k);log('seatDenied',{seat:`T${m.ti}-${m.k}`,why:m.why,holder:short(m.holder)});
+        if(s)unseatMe(s,'denied:'+m.why);if(m.holder)applySeat(m.ti,m.k,m.holder,m.v);
         toast(m.why==='noTea'?'팽주가 되려면 먼저 찻장에서 차를 골라 주세요':'이미 다른 분이 앉은 자리예요');break;}
+      case 'replaced':{   // another live tab took this session over: carry on as a new visitor instead of fighting over it
+        log('replaced',{});replacedBy=true;store.clear();break;}
       case 'player':{if(m.uid===uid){me.tea=m.tea;me.teaLeft=m.teaLeft;me.brewedAt=m.tea&&m.brewedAt!=null?m.brewedAt:null;lastHud='';}break;}
       case 'brewstep':{if(m.by===uid)break;if(m.step==='start')startRemoteBrew(m.ti,m.tea);else remoteBrewStep(m.ti,m.step);break;}
       case 'serve':{if(m.by===uid)break;const T=tables[m.ti];if(!T)break;if(remoteBrews.has(m.ti)){const rb=remoteBrews.get(m.ti);if(rb.step!=='poured')endRemoteBrew(m.ti);}if(m.tea&&TEAS[m.tea])setTeaColor(T,m.tea);
@@ -2140,17 +2187,19 @@ const NET=(()=>{
   function connect(){clearTimeout(retryT);if(!URL_WS){setStatus('noserver');return;}
     setStatus(retry?'reconnecting':'connecting');
     try{ws=new WebSocket(URL_WS);}catch(e){scheduleRetry();return;}
-    const sock=ws;
-    sock.onopen=()=>{sock.send(JSON.stringify({t:'hello',ch,sid:store.get(),look:ME_LOOK}));clearInterval(pingT);pingT=setInterval(()=>out({t:'ping'}),15000);};
-    sock.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(x){return;}onMsg(m);};
-    sock.onclose=()=>{if(ws!==sock)return;clearInterval(pingT);if(status==='full')return;scheduleRetry();};
+    const sock=ws,n=++nConn;
+    sock.onopen=()=>{log('open',{conn:n,retry,sid:!!store.get()});sock.send(JSON.stringify({t:'hello',ch,sid:store.get(),inst:INST,look:ME_LOOK}));clearInterval(pingT);pingT=setInterval(()=>out({t:'ping'}),15000);};
+    sock.onmessage=e=>{if(ws!==sock)return;let m;try{m=JSON.parse(e.data);}catch(x){return;}onMsg(m);};   // a replaced socket's late messages are ignored
+    sock.onclose=ev=>{log('close',{conn:n,code:ev&&ev.code,current:ws===sock});if(ws!==sock)return;clearInterval(pingT);if(status==='full')return;if(replacedBy){replacedBy=false;retry=0;}scheduleRetry();};
     sock.onerror=()=>{};}
   function scheduleRetry(){retry++;if(retry>6&&status!=='connected'&&!uid){setStatus('failed');}else setStatus('reconnecting');retryT=setTimeout(connect,Math.min(15000,1000*Math.pow(1.6,retry)));}
   addEventListener('online',()=>{if(status!=='connected'&&status!=='full'){retry=0;connect();}});
   return{
-    start(){if(started)return;started=true;info();connect();},
+    start(){if(started)return;started=true;info();const sid=store.get();
+      if(bc&&sid){bc.postMessage({q:'who',sid,inst:INST});setTimeout(()=>{if(dupSeen){log('dupTab',{});store.clear();}connect();},350);}else connect();},
+    log,
     get online(){return status==='connected';},get uid(){return uid;},get nick(){return nick;},
-    update(dt,mv){moving=mv;for(const P of members.values()){const c=P.c;if(!c||!P.seen)continue;const k=Math.min(1,dt*8);c.x+=(P.tx-c.x)*k;c.y+=(P.ty-c.y)*k;c.z+=(P.tz-c.z)*k;c.ry=lerpAngle(c.ry,P.try,k);
+    update(dt,mv){moving=mv;for(const P of members.values()){const c=P.c;if(!c||!P.seen)continue;const k=Math.min(1,dt*8);if(P.seat)placeSeated(P,false);c.x+=(P.tx-c.x)*k;c.y+=(P.ty-c.y)*k;c.z+=(P.tz-c.z)*k;c.ry=lerpAngle(c.ry,P.try,k);
         c.root.updateMatrixWorld(true);updateChar(c,dt,!!P.m&&P.pose==='stand');
         // a player on a raft sits on the same raft seat on every screen: their raft is drawn under them, unless one of
         // this screen's moored rafts is already in exactly that spot
@@ -2162,7 +2211,7 @@ const NET=(()=>{
       if(status!=='connected')return;sendT-=dt;const st=myState(),key=JSON.stringify(st);if(sendT<=0&&(key!==last||sendT<-1.5)){out({t:'st',s:st});last=key;sendT=.1;}},
     mood(e){out({t:'mood',e});},
     others(){return[...members.values()].filter(P=>P.online&&P.c&&P.seen).map(P=>({x:P.tx,z:P.tz,nick:P.nick}));},
-    sit(seat){out({t:'sit',ti:seat.table.i,k:seat.k});},stand(){out({t:'stand'});},tea(key){out({t:'tea',key});},
+    sit(seat){log('sitReq',{seat:`T${seat.table.i}-${seat.k}`});out({t:'sit',ti:seat.table.i,k:seat.k});},stand(){log('standReq',{});out({t:'stand'});},tea(key){out({t:'tea',key});},
     act(kind,d){out({t:'act',kind,d});},
     brewed(){out({t:'brewed'});},brewStep(step,tea){out({t:'brewstep',step,tea});},drink(){out({t:'drink'});},cupback(){out({t:'cupback'});},cheers(){out({t:'cheers'});},
     get members(){return members;}
@@ -2176,7 +2225,7 @@ const NET=(()=>{
 let lastHud='';
 function updateHud(){
   let status,act='',stand='',busy=false,snack=false;
-  if(me.brew){const c=BREW_TEXT[me.brew.step];status=`${tableName(me.brew.T.i)} · 팽주 · 1인칭`;act=c[0];busy=true;}
+  if(me.brew){const c=BREW_TEXT[me.brew.step];status=`${tableName(me.brew.T.i)} · 팽주 · 1인칭`;act=me.brew.auto&&me.brew.step!=='poured'?'':c[0];busy=true;stand='일어나기';}
   else if(me.mode==='gaze'){status='물멍 · 다른 곳을 누르면 일어나요';busy=true;}
   else if(me.mode==='rail'){status='난간에 기대어 풍경을 바라보는 중';stand='난간에서 물러나기';busy=true;}
   else if(me.mode==='boat'){const moored=me.boat&&me.boat.state==='berth';status=ride.active?'대나무 뗏목 · 호수를 도는 중':(ride.waiting?'대나무 뗏목 · 같이 탈 사람을 기다리는 중':'대나무 뗏목');stand=moored?'나룻배 내리기':'중간에 내리기';busy=true;}
@@ -2189,7 +2238,7 @@ function updateHud(){
   const where=me.seat||me.mode==='boat'?'':placeNow();
   const goLabel=(where==='dock'||where==='stones')?'다실로 돌아가기':'나루터로 가기';
   $('moodBtn').hidden=false;{const T=me.seat&&me.seat.table,ib=$('incenseBtn'),busy=!!(T&&(T.incense||T.incensePending));ib.hidden=!(me.seat&&!me.brew);ib.disabled=busy||!!me.action;ib.textContent=busy?'향이 타고 있어요':'향 피우기';}
-  let together=false;if(me.seat&&!me.brew){const T=me.seat.table;together=[0,1,2,3,4].every(k=>{const c=T.cups[k],o=seatOf(T,k).occ;return o&&c.state==='guest'&&c.level>.5&&!(o.action&&o.action.type!=='tap');});}
+  let together=false;if(me.seat&&!me.brew){const T=me.seat.table;together=[0,1,2,3,4].every(k=>{const c=T.cups[k],o=seatOf(T,k).occ;return o&&c.state==='guest'&&c.level>.1&&!(o.action&&o.action.type!=='tap');});}
   const feed=canFeed();const gaze=canGaze();const lan=canLantern(),skp=canSkip(),ofr=nearCourtCenser();const gd=guide.active&&me.mode==='walk'&&!me.seat&&!nearCabinet();const key=(lan?'L':'')+(skp?'K':'')+(ofr?'O':'')+(gd?'G':'')+(me.seat&&me.seat.table.incense?'i':'')+(me.action?'a':'')+status+act+stand+goLabel+busy+feed+snack+together+placeNow()+gaze;if(key===lastHud)return;lastHud=key;$('gazeBtn').hidden=!gaze;$('guideBtn').hidden=!gd;$('lanternBtn').hidden=!lan;$('skipBtn').hidden=!skp;{const ob=$('offerBtn');ob.hidden=!ofr;if(ofr){ob.disabled=!!me.action;ob.textContent='향로에 향 피우기';}}$('toastBtn').hidden=!together;$('feedBtn').hidden=!feed;$('waitBtn').hidden=!(me.mode==='walk'&&!me.seat&&placeNow()==='dock');$('snackBtn').hidden=!snack;
   $('statusText').textContent=status;$('chip').classList.toggle('busy',busy);
   $('actBtn').hidden=!act;$('actBtn').textContent=act;$('standBtn').hidden=!stand;$('standBtn').textContent=stand;$('goBtn').textContent=goLabel;$('goBtn').disabled=me.mode==='boat';
@@ -2293,18 +2342,27 @@ const kettle=(()=>{const g=new THREE.Group();const iron=M(0x2c2a28,{roughness:.5
 const waterStream=new THREE.Mesh(cyl(.005,.004,1,6),new THREE.MeshStandardMaterial({color:0xdfeef0,transparent:true,opacity:.55,roughness:.05}));waterStream.visible=false;waterStream.layers.set(1);scene.add(waterStream);
 const BREW_TEXT={ready:['찻잎 넣기','다호 뚜껑을 열고 찻잎을 넣어요'],leafing:['','찻잎이 다호 속으로 들어가요'],leafDone:['물 붓기','찻잎 위로 뜨거운 물을 부어요'],watering:['','물이 차오르며 찻잎이 풀려요'],watered:['공도배에 따르기','뚜껑을 닫고 공도배에 따라요'],closing:['','뚜껑을 닫는 중'],
   closed:['유리 공도배에 따르기','충분히 우러났어요'],pouring:['','공도배에 따르는 중'],poured:['차 따르기','공도배의 차를 손님 찻잔에 나눠 따라요']};
-function startBrew(T){me.brew={T,step:'ready',t:0,tea:me.tea};NET.brewStep('start',me.tea);setTeaColor(T,me.tea,false);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);cam.mode='fp';me.root.visible=false;T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
+function startBrew(T){me.brew={T,step:'ready',t:0,tea:me.tea,auto:true,aw:0};NET.brewStep('start',me.tea);setTeaColor(T,me.tea,false);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);cam.mode='fp';me.root.visible=false;T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
   {const V=T.vessel,Rm=Math.max(.006,profR(V.prof,V.floor+.006)*.75-.011);T.leafPlan=T.potLeaves.map(()=>{const a=rnd()*Math.PI*2,r=Math.sqrt(rnd())*Rm;return{x:Math.cos(a)*r,z:Math.sin(a)*r,y:V.floor+.002+rnd()*.006,d:rnd()*.45,r:rnd()*6,sx:-.025-rnd()*.07,sz:(rnd()-.5)*.016};});}lastHud='';}
 function brewNext(){const b=me.brew,T=b.T;
   if(b.step==='ready'){b.step='leafing';b.t=0;NET.brewStep('leafing');}
   else if(b.step==='leafDone'){b.step='watering';b.t=0;NET.brewStep('watering');}
   else if(b.step==='watered'){b.step='closing';b.t=0;NET.brewStep('closing');}
   else if(b.step==='closed'){b.step='pouring';b.t=0;T.busy=true;}
-  else if(b.step==='poured'){me.brew=null;cam.mode='follow';me.root.visible=true;$('brewCap').hidden=true;T.ready=true;T.potWater.visible=false;
+  else if(b.step==='poured'){me.brew=null;cam.mode='follow';me.root.visible=true;$('brewCap').hidden=true;T.potWater.visible=false;finishInfusion(T);}
+  lastHud='';}
+function finishInfusion(T){T.ready=true;
     NET.brewed();me.teaLeft--;me.brewedAt=T.i;const nm=TEAS[me.tea].name;if(me.teaLeft<=0){me.tea=null;me.brewedAt=null;}
     if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`${nm}${eul(nm)} 손님들께 따라 드려요 · ${me.teaLeft}번 남음`:`${nm}${eul(nm)} 손님들께 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
-    else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);}
-  lastHud='';}
+    else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);lastHud='';}
+// the host gets up while brewing: once the leaves are in, the infusion is finished on the way out so every seated
+// guest still gets a cup (the server serves them before the seat is let go); before that, nothing is used up
+function leaveBrew(){const b=me.brew;if(!b)return;const T=b.T;me.brew=null;
+  scoop.visible=false;kettle.visible=false;waterStream.visible=false;
+  T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;T.potWater.visible=false;
+  cam.mode='follow';me.root.visible=true;$('brewCap').hidden=true;lastHud='';
+  if(b.step==='ready'){NET.log('brewCancelled',{});return;}
+  T.pitcherLevel=Math.max(T.pitcherLevel,1);NET.log('brewFinishedOnStand',{step:b.step});finishInfusion(T);}
 // the leaves were already brewed at this table: the next infusion is simply poured from the fair cup into the guests' cups
 function pourAgain(T){if(!me.tea||me.teaLeft<=0)return;NET.brewed();me.teaLeft--;const nm=TEAS[me.tea].name;if(me.teaLeft<=0){me.tea=null;me.brewedAt=null;}
   T.pitcherLevel=1;T.ready=false;
@@ -2354,7 +2412,10 @@ function startRemoteBrew(ti,tea){const T=tables[ti];if(!T||!TEAS[tea]||(me.brew&
 function remoteBrewStep(ti,step){const b=remoteBrews.get(ti);if(!b)return;if(['leafing','watering','closing'].includes(step)){b.step=step;b.t=0;if(step==='closing')b.T.busy=false;}}
 function endRemoteBrew(ti){const b=remoteBrews.get(ti);if(!b)return;remoteBrews.delete(ti);for(const o of[b.scoop,b.kettle,b.ws])scene.remove(o);
   const T=b.T;T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;T.potWater.visible=false;}
+const AUTO_STEPS=['ready','leafDone','watered','closed'];
 function updateBrew(dt){
+  // '차 우리기' runs leaves -> water -> lid -> fair cup by itself, with a short beat between steps
+  if(me.brew&&me.brew.auto&&AUTO_STEPS.includes(me.brew.step)){me.brew.aw+=dt;if(me.brew.aw>.45){me.brew.aw=0;brewNext();}}
   if(me.brew){const b=me.brew;stepBrew(b,dt);if(me.brew){const cap=BREW_TEXT[b.step];$('brewCap').hidden=false;$('brewCap').textContent=`${TEAS[b.tea].full} · ${cap[1]}`;}}
   for(const[ti,b]of remoteBrews){stepBrew(b,dt);if(b.step==='poured'){b.pt=(b.pt||0)+dt;if(b.pt>8)endRemoteBrew(ti);}}}
 function fpView(posOut,lookOut){const b=me.brew,T=b.T;const toHost=new V3(-1,0,0).applyAxisAngle(YAX,T.rot);
@@ -2368,11 +2429,12 @@ ring.rotation.x=-Math.PI/2;ring.visible=false;scene.add(ring);
 const tapMark=new THREE.Mesh(new THREE.RingGeometry(.12,.18,24),new THREE.MeshBasicMaterial({color:0xf3ebde,transparent:true,opacity:0,depthWrite:false}));tapMark.rotation.x=-Math.PI/2;scene.add(tapMark);
 function sitMe(seat){
   if(seat.occ&&seat.occ!==me){toast('이미 다른 분이 앉은 자리예요');return;}
+  if(seat.host&&!me.tea){toast('팽주가 되려면 먼저 찻장에서 차를 가져와 주세요');me.route=[];me.seatTarget=null;ring.visible=false;return;}
   if(me.seat)me.seat.occ=null;seatChar(me,seat);me.route=[];me.seatTarget=null;ring.visible=false;NET.sit(seat);
   cam.yaw=Math.atan2(seat.x-seat.table.cx,seat.z-seat.table.cz)+.78;cam.pitch=.34;cam.dist=3.0;
-  if(seat.host&&!me.tea){toast('팽주가 되려면 먼저 찻장에서 차를 가져와 주세요');me.route=[];me.seatTarget=null;ring.visible=false;return;}
   const T=seat.table;if(seat.host&&me.tea)setTeaColor(T,me.tea);toast(seat.host?(me.tea?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}${eul(TEAS[me.tea].name)} 우려 보세요`:`${tableName(T.i)} 팽주석에 앉았어요. 찻장에서 차를 가져오면 우릴 수 있어요`):(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
 function standMe(){
+  if(me.brew&&me.seat&&me.seat.host&&!me.action)leaveBrew();
   if(!me.seat||me.action)return;const s=me.seat;s.occ=null;if(!s.host){const c=s.table.cups[s.k];if(c.state==='guest'||c.state==='toGuest'){c.level=0;sendCup(c,false);}}me.seat=null;setPose(me,'stand');NET.stand();
   const nx=s.x-Math.sin(s.ry)*.6,nz=s.z-Math.cos(s.ry)*.6;me.x=nx;me.z=nz;me.y=0;}
 function goSeat(seat){
