@@ -89,6 +89,9 @@ button:disabled{opacity:.5;cursor:default}
 @keyframes glow{0%,100%{transform:scale(1);opacity:.9}30%{transform:scale(1.07);opacity:1}55%{transform:scale(.95);opacity:.78}80%{transform:scale(1.04);opacity:.95}}
 #loading.done{opacity:0;pointer-events:none}
 @media (max-width:560px){
+  .brand p:not(#netInfo){display:none}
+  .brand{padding:8px 12px 9px}
+  #toast{font-size:12px;padding:6px 12px;top:max(70px,calc(env(safe-area-inset-top,0px) + 64px))}
   .brand h1{font-size:19px}
   .brand p{font-size:11px}
   button{padding:8px 11px;font-size:12.5px}
@@ -108,7 +111,6 @@ button:disabled{opacity:.5;cursor:default}
       <button id="goBtn" type="button">나루터로 가기</button>
       <button id="soundBtn" type="button">소리 켜기</button>
       <button id="nightBtn" type="button">밤으로</button>
-      <button id="viewBtn" type="button">전경 보기</button>
     </div>
   </div>
   <div class="bottom">
@@ -1808,7 +1810,7 @@ const NPC_LOOKS=[
 ];
 const chars=[];let lookI=0;
 function seatChar(ch,seat){ch.seat=seat;seat.occ=ch;ch.ry=seat.ry;const f=fwd(ch);const fo=seat.table?.04:.17;ch.x=seat.x+f.x*fo;ch.z=seat.z+f.z*fo;ch.y=0;setPose(ch,'sit',seat.top);}
-const NPC_TABLES={0:[0,1,2,3,4],4:[0,1,3],7:[0,2,3,4],5:[0,4],2:[0]};
+const NPC_TABLES={};   // tea tables start empty: only players who are actually connected sit there
 for(const[ti,ks]of Object.entries(NPC_TABLES)){const T=tables[ti];T.npc={host:null,guests:[],phase:'wait',timer:2+rnd()*6};
   for(const k of ks){const ch=makeChar(k===0?HOST_LOOKS[(+ti)%HOST_LOOKS.length]:NPC_LOOKS[lookI++%NPC_LOOKS.length]);scene.add(ch.root);setLayer(ch.root,1);
     seatChar(ch,seats.find(s=>s.table===T&&s.k===k));chars.push(ch);if(k===0)T.npc.host=ch;else T.npc.guests.push({ch,k,delay:0});}}
@@ -2021,9 +2023,7 @@ function planRoute(tx,tz,allow=null){
 /* ---------- HUD ---------- */
 const PLACE={room:'다실',veranda:'다실 툇마루',stairs:'다실 계단',garden:'월동문 정원',stones:'징검다리',dock:'나루터'};
 function placeNow(){const s=surfaceAt(me.x,me.z);return s?s.where:'room';}
-$('hint').innerHTML=isTouch
-  ?'바닥을 탭하면 걸어가요 · 의자를 탭하면 앉아요 · 드래그로 둘러보기 · 두 손가락으로 확대'
-  :'<kbd>W A S D</kbd> 이동 · 의자 클릭해 앉기 · <kbd>E</kbd> 앉기/일어나기 · <kbd>F</kbd> 차 우리기·마시기 · 드래그로 둘러보기 · <kbd>V</kbd> 전경';
+$('hint').hidden=isTouch;$('hint').innerHTML=isTouch?'':'<kbd>W A S D</kbd> 이동 · 의자 클릭해 앉기 · <kbd>E</kbd> 앉기/일어나기 · <kbd>F</kbd> 차 우리기·마시기 · 드래그로 둘러보기';
 /* ---------- multiplayer & nicknames (WebRTC between browsers via Trystero; there is NO game server) ----------
    What this does:
    - Each browser tab session gets a private unique id (uid, kept in sessionStorage).  Avatars, presence and the
@@ -2142,11 +2142,11 @@ function updateHud(){
   const goLabel=(where==='dock'||where==='stones')?'다실로 돌아가기':'나루터로 가기';
   $('moodBtn').hidden=false;{const T=me.seat&&me.seat.table,ib=$('incenseBtn'),busy=!!(T&&(T.incense||T.incensePending));ib.hidden=!(me.seat&&!me.brew);ib.disabled=busy||!!me.action;ib.textContent=busy?'향이 타고 있어요':'향 피우기';}
   let together=false;if(me.seat&&!me.brew){const T=me.seat.table;together=[0,1,2,3,4].every(k=>{const c=T.cups[k],o=seatOf(T,k).occ;return o&&c.state==='guest'&&c.level>.5&&!(o.action&&o.action.type!=='tap');});}
-  const feed=canFeed();const gaze=canGaze();const lan=canLantern(),skp=canSkip(),ofr=nearCourtCenser();const gd=guide.active&&me.mode==='walk'&&!me.seat&&!nearCabinet();const key=(lan?'L':'')+(skp?'K':'')+(ofr?'O':'')+(gd?'G':'')+(me.seat&&me.seat.table.incense?'i':'')+(me.action?'a':'')+status+act+stand+goLabel+busy+feed+snack+together+placeNow()+gaze;if(key===lastHud)return;lastHud=key;$('gazeBtn').hidden=!gaze;$('guideBtn').hidden=!gd;$('lanternBtn').hidden=!lan;$('skipBtn').hidden=!skp;{const ob=$('offerBtn');ob.hidden=!ofr;if(ofr){ob.disabled=!!me.action;ob.textContent='향로에 향 피우기';}}$('toastBtn').hidden=!together;$('feedBtn').hidden=!feed;$('waitBtn').hidden=!(me.mode==='walk'&&!me.seat&&placeNow()==='dock');$('snackBtn').hidden=!snack;
+  const feed=canFeed();const gaze=canGaze();const lan=canLantern(),skp=canSkip(),ofr=nearCourtCenser();const gd=guide.active&&me.mode==='walk'&&!me.seat&&!nearCabinet();const key=(lan?'L':'')+(skp?'K':'')+(ofr?'O':'')+(gd?'G':'')+(me.seat&&me.seat.table.incense?'i':'')+(me.action?'a':'')+status+act+stand+goLabel+busy+feed+snack+together+placeNow()+gaze;if(key===lastHud)return;lastHud=key;$('gazeBtn').hidden=!gaze;$('guideBtn').hidden=!gd;$('lanternBtn').hidden=!lan;$('skipBtn').hidden=!skp;{const ob=$('offerBtn');ob.hidden=!ofr;if(ofr){ob.disabled=!!me.action;ob.textContent='향로에 향 피우기';}}$('toastBtn').hidden=!together;$('feedBtn').hidden=!feed;$('waitBtn').hidden=true;$('snackBtn').hidden=!snack;
   $('statusText').textContent=status;$('chip').classList.toggle('busy',busy);
   $('actBtn').hidden=!act;$('actBtn').textContent=act;$('standBtn').hidden=!stand;$('standBtn').textContent=stand;$('goBtn').textContent=goLabel;$('goBtn').disabled=me.mode==='boat';
 }
-let toastTimer=0;function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);}
+let toastTimer=0;function toast(t){const el=$('toast');if(isTouch)t=String(t).split(/ · |\. |\n/)[0].replace(/\.$/,'');el.textContent=t;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);}
 
 /* ---------- feeding the koi ---------- */
 const pellets=[],ripples=[];let feeding=null;
@@ -2394,14 +2394,13 @@ $('goBtn').addEventListener('click',()=>{const w=placeNow();if(me.seat&&me.actio
 /* ---------- camera & input ---------- */
 const cam={yaw:Math.PI,pitch:.1,dist:isTouch?6.4:5.6,mode:'follow'};
 const camPos=new V3(me.x,me.y+1.15+Math.sin(.1)*5.6,me.z-5.6),camLook=new V3(me.x,me.y+1.15+.9,me.z);
-function setMode(m){if(me.brew)return;cam.mode=m;$('viewBtn').textContent=m==='follow'?'전경 보기':'내 시점';}
-$('viewBtn').addEventListener('click',()=>setMode(cam.mode==='follow'?'overview':'follow'));
+function setMode(m){if(me.brew)return;cam.mode=m;}
 const keys=new Set();
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;const k=e.key.toLowerCase();
   if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){keys.add(k);e.preventDefault();if(cam.mode!=='follow')setMode('follow');}
   if(k==='e'){if(me.seat)standMe();else if(me.mode==='walk'){let best=null,bd=1.6;for(const s of seats){const d=Math.hypot(s.x-me.x,s.z-me.z);if(d<bd&&!s.occ){bd=d;best=s;}}if(best)sitMe(best);}}
   if(k==='f')doAct();
-  if(k==='v')setMode(cam.mode==='follow'?'overview':'follow');});
+  });
 addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
 addEventListener('blur',()=>keys.clear());
 // keep the follow camera on the player's side of solid walls (the tea room's back wall, the moon-gate garden wall)
