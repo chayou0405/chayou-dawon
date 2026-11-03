@@ -134,8 +134,16 @@ function onMessage(conn, m) {
       broadcast(c, { t: 'drink', ti, k, uid: p.uid }, conn.ws); break;
     }
     case 'cupback': {
-      if (!p.seat || p.seat[1] === 0) return; const [ti, k] = p.seat; c.tables[ti].cups[k] = 0;
-      broadcast(c, { t: 'cupback', ti, k, uid: p.uid }, conn.ws); break;
+      if (!p.seat || p.seat[1] === 0) return; const [ti, k] = p.seat; const T = c.tables[ti]; T.cups[k] = 0;
+      broadcast(c, { t: 'cupback', ti, k, uid: p.uid }, conn.ws);
+      // the host has tea in the fair cup at this table: the empty cup is refilled and passed straight back,
+      // without a new infusion (and without the host having to press anything)
+      const hostUid = c.seats[ti][0];
+      if (hostUid && hostUid !== p.uid && T.brewed && T.tea) {
+        L('refill', { uid: p.uid, ch: c.id, seat: seatId([ti, k]) });
+        setTimeout(() => { if (c.seats[ti][k] === p.uid && c.seats[ti][0] === hostUid && T.brewed && !T.cups[k]) { T.cups[k] = SIPS; broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid }); } }, 1500);
+      }
+      break;
     }
     case 'cheers': {   // 함께 한 모금: everyone at that table drinks together
       if (!p.seat) return; const ti = p.seat[0];
