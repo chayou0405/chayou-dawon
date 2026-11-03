@@ -15,7 +15,7 @@ const CAP = +process.env.CAP || 88;            // per channel, hosts and guests 
 const GRACE = +process.env.GRACE_MS || 90000;   // a dropped connection keeps its character, name and seat this long (phones in the background)
 const LEAVE_MS = +process.env.LEAVE_MS || 6000;   // after the page says goodbye, the character leaves this soon unless a reload brings it back
 const LOG = process.env.DEBUG_LOG !== '0';     // dev log to stdout (server console only, never shown to players)
-const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 3, SIPS = 3;   // one brew + 2 more; a poured cup is three sips
+const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 3, SIPS = 3;   // brewed once, then shared up to 3 times; a poured cup is three sips
 const ROOT = __dirname;
 
 const A = ['살랑','소담','몽글','포근','고요한','느린','여린','은은한','잔잔한','다정한','따스한','아늑한'];

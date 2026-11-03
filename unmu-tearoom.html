@@ -174,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0030</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0040</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2256,11 +2256,11 @@ function updateHud(){
   else if(me.mode==='rail'){status='난간에 기대어 풍경을 바라보는 중';stand='난간에서 물러나기';busy=true;}
   else if(me.mode==='boat'){const moored=me.boat&&me.boat.state==='berth';status=ride.active?'대나무 뗏목 · 호수를 도는 중':(ride.waiting?'대나무 뗏목 · 같이 탈 사람을 기다리는 중':'대나무 뗏목');stand=moored?'나룻배 내리기':'중간에 내리기';busy=true;}
   else if(me.seat){const s=me.seat;{const hostHere=s.host||seatOf(s.table,0).occ;status=`${tableName(s.table.i)}${s.host?' · 팽주석':''} · ${hostHere?'오늘의 차 '+TEAS[s.table.teaType].full:'팽주를 기다리는 중'}`;}busy=true;stand='일어나기';
-    if(!me.action){const T=s.table;if(s.host){snack=true;const hc=T.cups[0];act=(T.busy||T.serving>0||T.passing)?'':(T.ready?'차 따르기':(hc.state==='guest'&&hc.level>.1?'차 마시기':(me.tea&&me.teaLeft>0&&me.brewedAt===T.i?'차 따르기':(me.tea?'차 우리기':'찻잎 가져오기'))));if(!me.tea&&!T.ready)status+=' · 찻장에서 새 차가 필요해요';}
+    if(!me.action){const T=s.table;if(s.host){snack=true;const hc=T.cups[0];act=(T.busy||T.serving>0||T.passing)?'':(T.ready?'차 나누기':(hc.state==='guest'&&hc.level>.1?'차 마시기':(me.tea&&me.teaLeft>0&&me.brewedAt===T.i?'차 나누기':(me.tea?'차 우리기':'찻잎 가져오기'))));if(!me.tea&&!T.ready)status+=' · 찻장에서 새 차가 필요해요';}
       else{const c=T.cups[s.k];if(c.state==='guest'&&c.level>.1)act='차 마시기';else if(c.state==='guest')act='찻잔 건네고 차 더 받기';else if(seatOf(T,0).occ)status+=' · 팽주가 차를 내는 중';snack=true;}}}
   else{const w=placeNow();status=PLACE[w]||'다실';
     if(w==='dock'&&!ride.active)act='혼자 타기';if(nearCabinet())act='찻장 열기';}
-  if(me.tea&&!me.brew)status+=` · ${TEAS[me.tea].name} ${me.teaLeft}회`;
+  if(me.tea&&!me.brew)status+=` · ${TEAS[me.tea].name} 나누기 ${me.teaLeft}회`;
   const where=me.seat||me.mode==='boat'?'':placeNow();
   const goLabel=(where==='dock'||where==='stones')?'다실로 돌아가기':'나루터로 가기';
   $('moodBtn').hidden=false;{const T=me.seat&&me.seat.table,ib=$('incenseBtn'),busy=!!(T&&(T.incense||T.incensePending));ib.hidden=!(me.seat&&!me.brew);ib.disabled=busy||!!me.action;ib.textContent=busy?'향이 타고 있어요':'향 피우기';}
@@ -2349,15 +2349,15 @@ $('nightBtn').addEventListener('click',()=>{nightTarget=nightTarget?0:1;$('night
 function nearCabinet(){return inRect(me.x,me.z,ROOM)&&me.z>HALF-2.6&&me.x>CAB.x0-.3&&me.x<CAB.x1+.3;}
 // 을/를 after a tea name, depending on whether its last syllable has a final consonant (용정을, 보이숙차를)
 const eul=w=>{const c=String(w).trim().slice(-1).charCodeAt(0)-0xAC00;return c>=0&&c<11172&&c%28?'을':'를';};
-const INFUSIONS=3;   // per tea from the cabinet: the first brew plus 2 more
+const INFUSIONS=3;   // per tea from the cabinet: brewed once, then shared (poured for the guests) up to 3 times
 function openTeaPanel(swap=false){const list=$('teaList');list.innerHTML='';
   if(me.tea){const t=TEAS[me.tea];
-    if(!swap){list.insertAdjacentHTML('beforeend',`<div class="teaHave"><p>지금 ${t.full}${eul(t.full)} 가지고 있어요 (남은 우림 ${me.teaLeft}번).</p><button type="button" class="teaSwap">찻잎 바꾸기</button></div>`);
+    if(!swap){list.insertAdjacentHTML('beforeend',`<div class="teaHave"><p>지금 ${t.full}${eul(t.full)} 가지고 있어요 (남은 차 나누기 ${me.teaLeft}번).</p><button type="button" class="teaSwap">찻잎 바꾸기</button></div>`);
       list.querySelector('.teaSwap').addEventListener('click',()=>{renderTeaList(true);});}
-    else list.insertAdjacentHTML('beforeend',`<p>바꿀 차를 골라 주세요. 가지고 있던 ${t.full}${eul(t.full)} 찻장에 돌려놓고, 새 차로 다시 세 번 우릴 수 있어요.</p>`);}
+    else list.insertAdjacentHTML('beforeend',`<p>바꿀 차를 골라 주세요. 가지고 있던 ${t.full}${eul(t.full)} 찻장에 돌려놓고, 새 차로 한 번 우려 세 번 나눌 수 있어요.</p>`);}
   for(const k of TEA_KEYS){const t=TEAS[k],b=document.createElement('button');b.type='button';b.className='teaItem'+(me.tea===k?' on':'');b.disabled=!!me.tea&&(!swap||me.tea===k);
     b.innerHTML=`<i class="sw" style="background:#${t.liquor.toString(16).padStart(6,'0')}"></i><div><b>${t.full}</b><span>${t.han}</span></div>`;
-    b.addEventListener('click',()=>{if(me.tea&&(!swap||me.tea===k))return;const swapped=!!me.tea;me.tea=k;me.teaLeft=INFUSIONS;me.brewedAt=null;NET.tea(k,swapped);me.route=[];{const out=Math.atan2(-1.1-me.x,CAB.z-me.z)+Math.PI;me.backStep={left:2.25,ry:out,turn:.45};setMode('follow');cam.yaw=out+Math.PI;cam.pitch=.2;}$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(swapped?`${t.full}${eul(t.full)} 새로 챙겼어요. 한 번 우리고 두 번 더 따를 수 있어요`:`${t.full}${eul(t.full)} 챙겼어요. 한 번 우리고 두 번 더 따를 수 있어요`);canvas.focus();});list.appendChild(b);}
+    b.addEventListener('click',()=>{if(me.tea&&(!swap||me.tea===k))return;const swapped=!!me.tea;me.tea=k;me.teaLeft=INFUSIONS;me.brewedAt=null;NET.tea(k,swapped);me.route=[];{const out=Math.atan2(-1.1-me.x,CAB.z-me.z)+Math.PI;me.backStep={left:2.25,ry:out,turn:.45};setMode('follow');cam.yaw=out+Math.PI;cam.pitch=.2;}$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(swapped?`${t.full}${eul(t.full)} 새로 챙겼어요. 한 번 우려 세 번 나눌 수 있어요`:`${t.full}${eul(t.full)} 챙겼어요. 한 번 우려 세 번 나눌 수 있어요`);canvas.focus();});list.appendChild(b);}
   if(swap)return;
   openCabinetDoors();const tok=teaOpenTok=(teaOpenTok||0)+1;setTimeout(()=>{if(tok===teaOpenTok&&nearCabinet())$('teaPanel').hidden=false;},650);}
 let teaOpenTok=0;
@@ -2372,7 +2372,7 @@ const kettle=(()=>{const g=new THREE.Group();const iron=M(0x2c2a28,{roughness:.5
   g.visible=false;g.traverse(o=>o.layers.set(1));scene.add(g);return g;})();
 const waterStream=new THREE.Mesh(cyl(.005,.004,1,6),new THREE.MeshStandardMaterial({color:0xdfeef0,transparent:true,opacity:.55,roughness:.05}));waterStream.visible=false;waterStream.layers.set(1);scene.add(waterStream);
 const BREW_TEXT={ready:['찻잎 넣기','다호 뚜껑을 열고 찻잎을 넣어요'],leafing:['','찻잎이 다호 속으로 들어가요'],leafDone:['물 붓기','찻잎 위로 뜨거운 물을 부어요'],watering:['','물이 차오르며 찻잎이 풀려요'],watered:['공도배에 따르기','뚜껑을 닫고 공도배에 따라요'],closing:['','뚜껑을 닫는 중'],
-  closed:['유리 공도배에 따르기','충분히 우러났어요'],pouring:['','공도배에 따르는 중'],poured:['차 따르기','공도배의 차를 손님 찻잔에 나눠 따라요']};
+  closed:['유리 공도배에 따르기','충분히 우러났어요'],pouring:['','공도배에 따르는 중'],poured:['차 나누기','공도배의 차를 손님 찻잔에 나눠 따라요']};
 function startBrew(T){me.brew={T,step:'ready',t:0,tea:me.tea,auto:true,aw:0};NET.brewStep('start',me.tea);setTeaColor(T,me.tea,false);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);cam.mode='fp';me.root.visible=false;T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
   {const V=T.vessel,Rm=Math.max(.006,profR(V.prof,V.floor+.006)*.75-.011);T.leafPlan=T.potLeaves.map(()=>{const a=rnd()*Math.PI*2,r=Math.sqrt(rnd())*Rm;return{x:Math.cos(a)*r,z:Math.sin(a)*r,y:V.floor+.002+rnd()*.006,d:rnd()*.45,r:rnd()*6,sx:-.025-rnd()*.07,sz:(rnd()-.5)*.016};});}lastHud='';}
 function brewNext(){const b=me.brew,T=b.T;
@@ -2384,8 +2384,8 @@ function brewNext(){const b=me.brew,T=b.T;
   lastHud='';}
 function finishInfusion(T){T.ready=true;
     NET.brewed();me.teaLeft--;me.brewedAt=T.i;const nm=TEAS[me.tea].name;if(me.teaLeft<=0){me.tea=null;me.brewedAt=null;}
-    if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`${nm}${eul(nm)} 손님들께 따라 드려요 · ${me.teaLeft}번 남음`:`${nm}${eul(nm)} 손님들께 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
-    else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);lastHud='';}
+    if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`${nm}${eul(nm)} 손님들께 따라 드려요 · 나누기 ${me.teaLeft}번 남음`:`${nm}${eul(nm)} 손님들께 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
+    else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} 나누기 ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);lastHud='';}
 // the host gets up while brewing: once the leaves are in, the infusion is finished on the way out so every seated
 // guest still gets a cup (the server serves them before the seat is let go); before that, nothing is used up
 function leaveBrew(){const b=me.brew;if(!b)return;const T=b.T;me.brew=null;
@@ -2397,8 +2397,8 @@ function leaveBrew(){const b=me.brew;if(!b)return;const T=b.T;me.brew=null;
 // the leaves were already brewed at this table: the next infusion is simply poured from the fair cup into the guests' cups
 function pourAgain(T){if(!me.tea||me.teaLeft<=0)return;NET.brewed();me.teaLeft--;const nm=TEAS[me.tea].name;if(me.teaLeft<=0){me.tea=null;me.brewedAt=null;}
   T.pitcherLevel=1;T.ready=false;
-  if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`공도배의 ${nm}${eul(nm)} 따라 드려요 · ${me.teaLeft}번 남음`:`마지막 ${nm}${eul(nm)} 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
-  else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);lastHud='';}
+  if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`공도배의 ${nm}${eul(nm)} 따라 드려요 · 나누기 ${me.teaLeft}번 남음`:`마지막 ${nm}${eul(nm)} 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
+  else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} 나누기 ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);lastHud='';}
 const POT_PROF=[[0,.05],[.02,.068],[.048,.078],[.072,.072],[.09,.055],[.1,.037]];
 function potR(y){for(let i=1;i<POT_PROF.length;i++){const[a,ra]=POT_PROF[i-1],[b,rb]=POT_PROF[i];if(y<=b)return lerp(ra,rb,clamp((y-a)/(b-a),0,1));}return .037;}
 const LID_ASIDE=new V3(0,-.004,.16);
