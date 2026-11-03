@@ -177,7 +177,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2320</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2330</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -1840,6 +1840,11 @@ for(const[ti,ks]of Object.entries(NPC_TABLES)){const T=tables[ti];T.npc={host:nu
     seatChar(ch,seats.find(s=>s.table===T&&s.k===k));chars.push(ch);if(k===0)T.npc.host=ch;else T.npc.guests.push({ch,k,delay:0});}}
 for(const T of tables)for(let k=0;k<NSEAT;k++)T.cups[k].T=T;
 
+// a fresh entry (the link opened again, typed, or reopened after closing) starts over as a new visitor:
+// only a reload of the same page keeps the name, character and seat
+const FRESH_ENTRY=(()=>{try{const n=performance.getEntriesByType('navigation')[0];return !n||n.type!=='reload';}catch(e){return true;}})();
+const PREV_SIDS={};   // the session this tab had before, so the server can let that old character go right away
+if(FRESH_ENTRY)try{for(const k of Object.keys(sessionStorage))if(k.startsWith('chayou-')){if(k.startsWith('chayou-sid:'))PREV_SIDS[k]=sessionStorage.getItem(k);sessionStorage.removeItem(k);}}catch(e){}
 const ME_GENDER=(()=>{try{return sessionStorage.getItem('chayou-gender');}catch(e){return null;}})();
 const ME_LOOK={robe:['#7fa596','#c9a35e','#8f5a46','#3e5b78','#c9a3b8','#789262','#d6e4ea','#574266'][Math.floor(Math.random()*8)],trim:'#f3ead6',style:ME_GENDER==='m'?'top':'bun',face:ME_GENDER==='m'?'round':['round','lash'][Math.floor(Math.random()*2)],hairColor:0x2a1e18,bead:0xf2c14e};
 const me=makeChar(ME_LOOK);
@@ -2083,7 +2088,8 @@ const NET=(()=>{
   const DEV=q.has('debug')||(()=>{try{return localStorage.getItem('chayou-debug')==='1';}catch(e){return false;}})();
   const logBuf=[];if(DEV)window.__chayouLog=logBuf;
   function log(ev,o={}){if(!DEV)return;const r={t:+(performance.now()/1000).toFixed(2),ev,me:uid&&uid.slice(0,8),cid,ch,...o};logBuf.push(r);if(logBuf.length>3000)logBuf.shift();try{console.debug('[chayou]',ev,JSON.stringify(o));}catch(e){}}
-  const INST=Math.random().toString(36).slice(2,10);   // this page load (a duplicated tab gets its own)
+  const INST=Math.random().toString(36).slice(2,10);
+  let prevSid=PREV_SIDS[KEY+ch]||null;   // this page load (a duplicated tab gets its own)
   // a duplicated browser tab copies sessionStorage, so two live tabs would share one session and keep taking the
   // character from each other. Before using a stored session, ask the other open tabs whether one of them is using it.
   let bc=null,dupSeen=false;try{bc=new BroadcastChannel('chayou-tabs');}catch(e){}
@@ -2188,15 +2194,20 @@ const NET=(()=>{
     setStatus(retry?'reconnecting':'connecting');
     try{ws=new WebSocket(URL_WS);}catch(e){scheduleRetry();return;}
     const sock=ws,n=++nConn;
-    sock.onopen=()=>{log('open',{conn:n,retry,sid:!!store.get()});sock.send(JSON.stringify({t:'hello',ch,sid:store.get(),inst:INST,look:ME_LOOK}));clearInterval(pingT);pingT=setInterval(()=>out({t:'ping'}),15000);};
+    sock.onopen=()=>{log('open',{conn:n,retry,sid:!!store.get()});sock.send(JSON.stringify({t:'hello',ch,sid:store.get(),prev:prevSid,inst:INST,look:ME_LOOK}));prevSid=null;clearInterval(pingT);pingT=setInterval(()=>out({t:'ping'}),15000);};
     sock.onmessage=e=>{if(ws!==sock)return;let m;try{m=JSON.parse(e.data);}catch(x){return;}onMsg(m);};   // a replaced socket's late messages are ignored
     sock.onclose=ev=>{log('close',{conn:n,code:ev&&ev.code,current:ws===sock});if(ws!==sock)return;clearInterval(pingT);if(status==='full')return;if(replacedBy){replacedBy=false;retry=0;}scheduleRetry();};
     sock.onerror=()=>{};}
   function scheduleRetry(){retry++;if(retry>6&&status!=='connected'&&!uid){setStatus('failed');}else setStatus('reconnecting');retryT=setTimeout(connect,Math.min(15000,1000*Math.pow(1.6,retry)));}
+  // leaving the page (closing the tab, going to another site): tell the server so the character leaves within seconds.
+  // A reload sends this too, but comes back before the server lets the character go; a page kept in the
+  // back/forward cache (persisted) is not leaving.
+  addEventListener('pagehide',e=>{if(e.persisted)return;log('bye',{});try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:'bye'}));}catch(x){}});
   addEventListener('online',()=>{if(status!=='connected'&&status!=='full'){retry=0;connect();}});
   return{
-    start(){if(started)return;started=true;info();const sid=store.get();
-      if(bc&&sid){bc.postMessage({q:'who',sid,inst:INST});setTimeout(()=>{if(dupSeen){log('dupTab',{});store.clear();}connect();},350);}else connect();},
+    start(){if(started)return;started=true;info();const sid=store.get()||prevSid;
+      // still open in another tab? then that tab keeps it: this one neither resumes it nor asks the server to drop it
+      if(bc&&sid){bc.postMessage({q:'who',sid,inst:INST});setTimeout(()=>{if(dupSeen){log('dupTab',{});store.clear();prevSid=null;}connect();},350);}else connect();},
     log,
     get online(){return status==='connected';},get uid(){return uid;},get nick(){return nick;},
     update(dt,mv){moving=mv;for(const P of members.values()){const c=P.c;if(!c||!P.seen)continue;const k=Math.min(1,dt*8);if(P.seat)placeSeated(P,false);c.x+=(P.tx-c.x)*k;c.y+=(P.ty-c.y)*k;c.z+=(P.tz-c.z)*k;c.ry=lerpAngle(c.ry,P.try,k);

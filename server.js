@@ -13,6 +13,7 @@ const http = require('http'), crypto = require('crypto'), fs = require('fs'), pa
 const PORT = +process.env.PORT || 8080;
 const CAP = +process.env.CAP || 88;            // per channel, hosts and guests included
 const GRACE = +process.env.GRACE_MS || 90000;   // a dropped connection keeps its character, name and seat this long (phones in the background)
+const LEAVE_MS = +process.env.LEAVE_MS || 6000;   // after the page says goodbye, the character leaves this soon unless a reload brings it back
 const LOG = process.env.DEBUG_LOG !== '0';     // dev log to stdout (server console only, never shown to players)
 const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 6, SIPS = 3;   // one brew + 5 more; a poured cup is three sips
 const ROOT = __dirname;
@@ -151,6 +152,11 @@ function onMessage(conn, m) {
       for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) c.tables[ti].cups[k] = Math.max(0, (c.tables[ti].cups[k] | 0) - 1);
       broadcast(c, { t: 'cheers', ti, by: p.uid }); break;
     }
+    case 'bye': {   // the page is closing; a reload comes straight back with the same session and keeps everything
+      L('bye', { uid: p.uid, cid: conn.cid, ch: c.id, seat: seatId(p.seat) });
+      clearTimeout(p.byeTimer); p.byeTimer = setTimeout(() => { if (c.players.get(p.uid) === p && p.byeCid === conn.cid) { clearTimeout(p.graceTimer); removePlayer(c, p, 'left'); } }, LEAVE_MS);
+      p.byeCid = conn.cid; break;
+    }
     case 'mood': if (typeof m.e === 'string' && m.e.length <= 8) broadcast(c, { t: 'mood', uid: p.uid, e: m.e }, conn.ws); break;
     case 'ping': send(conn.ws, { t: 'pong' }); break;
   }
@@ -162,10 +168,12 @@ function hello(conn, m) {
   if (!channels.has(id) && channels.size >= MAX_CHANNELS) return send(conn.ws, { t: 'error', why: 'tooManyServers' });
   const c = channel(id);
   // same browser session coming back (reload / short drop): same id, same name, same seat
+  // a fresh entry from the same tab: the character this tab left behind (still in its grace window) goes now
+  if (typeof m.prev === 'string' && m.prev !== m.sid) { const ou = c.bySid.get(m.prev), op = ou && c.players.get(ou); if (op && !op.online) { clearTimeout(op.graceTimer); clearTimeout(op.byeTimer); removePlayer(c, op, 'reentered'); c.retired.delete(m.prev); } }
   const back = typeof m.sid === 'string' && c.bySid.get(m.sid);
   let p = back && c.players.get(back);
   if (p) {
-    clearTimeout(p.graceTimer); p.graceTimer = null;
+    clearTimeout(p.graceTimer); p.graceTimer = null; clearTimeout(p.byeTimer); p.byeCid = null;
     const wasOnline = p.online;
     if (p.online && p.ws !== conn.ws) {   // the session's older connection is still open (a half-dead socket, or the same session in another tab)
       send(p.ws, { t: 'replaced' }); const old = p.ws; p.ws = null; try { old.close(); } catch (e) {}
