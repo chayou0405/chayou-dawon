@@ -101,7 +101,8 @@ function onMessage(conn, m) {
       const hostUid = c.seats[ti][0], T = c.tables[ti];
       if (k > 0 && hostUid && hostUid !== p.uid && T.brewed && !T.cups[k]) {
         T.cups[k] = SIPS;
-        setTimeout(() => { if (c.seats[ti][k] === p.uid && c.seats[ti][0] === hostUid) broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid }); }, 1200);
+        L('serveNewGuest', { uid: p.uid, ch: c.id, seat: seatId([ti, k]) });
+        setTimeout(() => { if (c.seats[ti][k] === p.uid && c.seats[ti][0] === hostUid) broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid }); }, 900);   // straight from the fair cup, no new infusion
       } else if (k > 0 && hostUid && hostUid !== p.uid && !T.brewed) {
         const h = c.players.get(hostUid); if (h) send(h.ws, { t: 'newGuest', ti, k });
       }

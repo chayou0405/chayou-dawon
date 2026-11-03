@@ -177,7 +177,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2245</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2320</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2127,19 +2127,19 @@ const NET=(()=>{
     const prev=holders.get(key)||null;holders.set(key,who||null);
     if(prev!==(who||null))log('seat',{seat:'T'+key,uid:short(who),prev:short(prev),v});
     if(k===0&&!who)endRemoteBrew(ti);
-    if(prev&&prev!==who){const Q=members.get(prev);if(Q&&Q.seat===s){Q.seat=null;if(Q.c)Q.c.seat=null;}}
+    if(prev&&prev!==who){const Q=members.get(prev);if(Q&&Q.seat===s){Q.seat=null;if(Q.c)Q.c.seat=null;}if(!who&&k>0&&prev!==uid)vanishCup(s.table.cups[k]);}
     if(s.occ&&s.occ!==me&&!(who&&members.get(who)&&members.get(who).c===s.occ))s.occ=null;
     if(who===uid){if(me.seat===s)s.occ=me;return;}
     if(who&&me.seat===s)unseatMe(s,'heldBy:'+short(who));
     const P=who&&members.get(who);
-    if(P){if(P.seat&&P.seat!==s&&P.seat.occ===P.c)P.seat.occ=null;avatar(P);P.seat=s;s.occ=P.c;P.c.seat=s;placeSeated(P,false);}
+    if(P){if(P.seat&&P.seat!==s&&P.seat.occ===P.c)P.seat.occ=null;readyCup(s.table,k);avatar(P);P.seat=s;s.occ=P.c;P.c.seat=s;placeSeated(P,false);}
     else if(!who&&s.occ&&s.occ!==me)s.occ=null;}
   // full snapshot (welcome) vs. partial updates: only a full snapshot may remove someone who is not listed
   function upsert(p,full){let P=members.get(p.uid);if(!P){P={uid:p.uid};members.set(p.uid,P);}P.nick=p.nick;P.look=p.look;P.online=p.online!==false;
     if(full||p.q!=null)P.q=p.q!=null?p.q:P.q;   // snapshot order stamp
     avatar(P);if(p.st){if(P.seat)P.st=p.st;else applySt(P,p.st,!P.seen);}return P;}   // someone briefly offline keeps their character and seat until they really leave
   function restoreSeat(s){   // this page was reloaded (or reconnected) while the server still holds our seat: sit back down quietly
-    if(me.seat===s||me.mode!=='walk'||me.brew)return;if(me.seat)me.seat.occ=null;seatChar(me,s);me.route=[];me.seatTarget=null;ring.visible=false;
+    if(me.seat===s||me.mode!=='walk'||me.brew)return;if(me.seat)me.seat.occ=null;seatChar(me,s);readyCup(s.table,s.k);me.route=[];me.seatTarget=null;ring.visible=false;
     cam.yaw=Math.atan2(s.x-s.table.cx,s.z-s.table.cz)+.78;cam.pitch=.34;cam.dist=3.0;lastHud='';log('restoreSeat',{seat:`T${s.table.i}-${s.k}`});}
   function onMsg(m){
     switch(m.t){
@@ -2412,16 +2412,30 @@ function startRemoteBrew(ti,tea){const T=tables[ti];if(!T||!TEAS[tea]||(me.brew&
 function remoteBrewStep(ti,step){const b=remoteBrews.get(ti);if(!b)return;if(['leafing','watering','closing'].includes(step)){b.step=step;b.t=0;if(step==='closing')b.T.busy=false;}}
 function endRemoteBrew(ti){const b=remoteBrews.get(ti);if(!b)return;remoteBrews.delete(ti);for(const o of[b.scoop,b.kettle,b.ws])scene.remove(o);
   const T=b.T;T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;T.potWater.visible=false;}
-const AUTO_STEPS=['ready','leafDone','watered','closed'];
+const AUTO_STEPS=['ready','leafDone','watered','closed'],BREW_PACE=.8;   // brewing runs at 80% speed
 function updateBrew(dt){
   // '차 우리기' runs leaves -> water -> lid -> fair cup by itself, with a short beat between steps
-  if(me.brew&&me.brew.auto&&AUTO_STEPS.includes(me.brew.step)){me.brew.aw+=dt;if(me.brew.aw>.45){me.brew.aw=0;brewNext();}}
-  if(me.brew){const b=me.brew;stepBrew(b,dt);if(me.brew){const cap=BREW_TEXT[b.step];$('brewCap').hidden=false;$('brewCap').textContent=`${TEAS[b.tea].full} · ${cap[1]}`;}}
-  for(const[ti,b]of remoteBrews){stepBrew(b,dt);if(b.step==='poured'){b.pt=(b.pt||0)+dt;if(b.pt>8)endRemoteBrew(ti);}}}
+  if(me.brew&&me.brew.auto&&AUTO_STEPS.includes(me.brew.step)){me.brew.aw+=dt;if(me.brew.aw>.45/BREW_PACE){me.brew.aw=0;brewNext();}}
+  if(me.brew){const b=me.brew;stepBrew(b,dt*BREW_PACE);if(me.brew){const cap=BREW_TEXT[b.step];$('brewCap').hidden=false;$('brewCap').textContent=`${TEAS[b.tea].full} · ${cap[1]}`;}}
+  for(const[ti,b]of remoteBrews){stepBrew(b,dt*BREW_PACE);if(b.step==='poured'){b.pt=(b.pt||0)+dt;if(b.pt>8)endRemoteBrew(ti);}}}
+// brewing view: keep the gaiwan, kettle and fair cup all inside the frame on any screen shape. A narrow (portrait
+// phone) screen first gets a wider lens, then, if that is still not enough, the camera steps back.
+const FP_HALF=Math.atan(.36/.62);   // the tea set spreads about ±0.36 m around the point the view looks at, ~0.62 m away
+function fpFit(){const asp=camera.aspect||1,want=2*Math.atan(Math.tan(FP_HALF)/asp)*180/Math.PI,fov=clamp(want,42,72);
+  const hHalf=Math.atan(Math.tan(fov*Math.PI/360)*asp);return{fov,k:Math.max(1,Math.tan(FP_HALF)/Math.tan(hHalf))};}
 function fpView(posOut,lookOut){const b=me.brew,T=b.T;const toHost=new V3(-1,0,0).applyAxisAngle(YAX,T.rot);
   if(b.step==='pouring'||b.step==='poured'){const pit=tableWorld(T,new V3(T.pitcher.position.x,T.pitcher.position.y+.06,T.pitcher.position.z),new V3());
     const side=new V3(0,0,1).applyAxisAngle(YAX,T.rot);lookOut.copy(pit).add(new V3(.0,.0,0)).addScaledVector(toHost,-.06);posOut.copy(pit).addScaledVector(side,-.55).addScaledVector(toHost,.28).add(new V3(0,.24,0));}
-  else{const mouth=tableWorld(T,new V3(T.potRest.x,T.potRest.y+.06,T.potRest.z),new V3());const side=new V3(0,0,1).applyAxisAngle(YAX,T.rot);lookOut.copy(mouth).addScaledVector(side,b.step==='watering'?.08:0);posOut.copy(mouth).addScaledVector(toHost,.42).add(new V3(0,.46,0));}}
+  else{const mouth=tableWorld(T,new V3(T.potRest.x,T.potRest.y+.06,T.potRest.z),new V3());const side=new V3(0,0,1).applyAxisAngle(YAX,T.rot);lookOut.copy(mouth).addScaledVector(side,b.step==='watering'?.08:0);posOut.copy(mouth).addScaledVector(toHost,.42).add(new V3(0,.46,0));}
+  // frame everything this stage uses (gaiwan, scoop, the kettle at its pouring spot, the fair cup, the lifted pot):
+  // same viewing direction as above, centred on those points, and far enough back that they all fit on this screen
+  {const W=(x,y,z)=>tableWorld(T,new V3(x,y,z),new V3()),side=new V3(0,0,1).applyAxisAngle(YAX,T.rot),pr=T.potRest,pp=T.pitcher.position;
+    const mouth=W(pr.x,pr.y+T.vessel.top,pr.z),pit=W(pp.x,pp.y,pp.z),pts=[mouth,mouth.clone().add(new V3(0,-.06,0)),pit,pit.clone().add(new V3(0,.1,0))];
+    if(b.step==='pouring'||b.step==='poured')pts.push(pit.clone().add(new V3(0,.3,0)),pit.clone().addScaledVector(toHost,.08).add(new V3(0,.22,0)));
+    else{const near=mouth.clone().addScaledVector(side,.2).add(new V3(0,.12,0));pts.push(mouth.clone().add(new V3(0,.14,0)),near.clone().add(new V3(0,.17,0)),near.clone().addScaledVector(side,.13),near.clone().add(new V3(0,-.05,0)));}
+    const c=new V3();for(const q of pts)c.add(q);c.multiplyScalar(1/pts.length);let r=0;for(const q of pts)r=Math.max(r,q.distanceTo(c));
+    const dir=posOut.clone().sub(lookOut).normalize(),fov=fpFit().fov*Math.PI/360,half=Math.min(fov,Math.atan(Math.tan(fov)*(camera.aspect||1)));
+    lookOut.copy(c);posOut.copy(c).addScaledVector(dir,Math.max(.45,(r+.04)/Math.sin(half)));}}
 
 /* ---------- player actions ---------- */
 const ring=new THREE.Mesh(new THREE.RingGeometry(.42,.5,32),new THREE.MeshBasicMaterial({color:0xa6c9a4,transparent:true,opacity:.85,depthWrite:false}));
@@ -2430,13 +2444,14 @@ const tapMark=new THREE.Mesh(new THREE.RingGeometry(.12,.18,24),new THREE.MeshBa
 function sitMe(seat){
   if(seat.occ&&seat.occ!==me){toast('이미 다른 분이 앉은 자리예요');return;}
   if(seat.host&&!me.tea){toast('팽주가 되려면 먼저 찻장에서 차를 가져와 주세요');me.route=[];me.seatTarget=null;ring.visible=false;return;}
-  if(me.seat)me.seat.occ=null;seatChar(me,seat);me.route=[];me.seatTarget=null;ring.visible=false;NET.sit(seat);
+  if(me.seat)me.seat.occ=null;seatChar(me,seat);readyCup(seat.table,seat.k);me.route=[];me.seatTarget=null;ring.visible=false;NET.sit(seat);
   cam.yaw=Math.atan2(seat.x-seat.table.cx,seat.z-seat.table.cz)+.78;cam.pitch=.34;cam.dist=3.0;
   const T=seat.table;if(seat.host&&me.tea)setTeaColor(T,me.tea);toast(seat.host?(me.tea?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}${eul(TEAS[me.tea].name)} 우려 보세요`:`${tableName(T.i)} 팽주석에 앉았어요. 찻장에서 차를 가져오면 우릴 수 있어요`):(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
 function standMe(){
   if(me.brew&&me.seat&&me.seat.host&&!me.action)leaveBrew();
-  if(!me.seat||me.action)return;const s=me.seat;s.occ=null;if(!s.host){const c=s.table.cups[s.k];if(c.state==='guest'||c.state==='toGuest'){c.level=0;sendCup(c,false);}}me.seat=null;setPose(me,'stand');NET.stand();
-  const nx=s.x-Math.sin(s.ry)*.6,nz=s.z-Math.cos(s.ry)*.6;me.x=nx;me.z=nz;me.y=0;}
+  if(!me.seat||me.action)return;const s=me.seat;s.occ=null;if(!s.host)vanishCup(s.table.cups[s.k]);me.seat=null;setPose(me,'stand');NET.stand();
+  const nx=s.x-Math.sin(s.ry)*.6,nz=s.z-Math.cos(s.ry)*.6;me.x=nx;me.z=nz;me.y=0;
+  if(cam.dist<(isTouch?3.6:2.4))cam.dist=isTouch?6.6:5.6;}   // zoomed in at the table: back to the walking distance
 function goSeat(seat){
   if(me.seat===seat||me.mode==='boat'||me.brew)return;
   if(seat.host&&!me.tea&&!seat.occ){toast('팽주가 되려면 먼저 찻장에서 차를 가져와 주세요');return;}
@@ -2519,8 +2534,8 @@ function replayAct(ch,kind,d){if(ch.action&&kind!=='toss')clearAction(ch);
   else if(kind==='toss'&&Array.isArray(d.p)){clearAction(ch);ch.action={type:'toss',t:0,P:new V3(d.p[0],LAKE.y,d.p[1]),thrown:false,hand:d.hand==='L'?'L':'R'};}
   else if(kind==='lantern'&&typeof d.txt==='string'){const L=makeLantern(d.txt.slice(0,40),d.kind==='worry'?'worry':'wish');ch.action={type:'lantern',t:0,L};}}
 // pour a single cup for a guest who just sat down (the host has already brewed at this table)
-function serveOne(T,k,tea,tries=0){const c=T.cups[k];if(!c)return;
-  if(T.serveAnim||T.passing||T.busy){if(tries<8)setTimeout(()=>serveOne(T,k,tea,tries+1),900);return;}
+function serveOne(T,k,tea,tries=0){const c=T.cups[k];if(!c)return;readyCup(T,k);
+  if(T.serveAnim||T.passing||T.busy){if(tries<30)setTimeout(()=>serveOne(T,k,tea,tries+1),600);return;}
   if(tea&&TEAS[tea]&&T.teaType!==tea)setTeaColor(T,tea);
   if(c.state!=='host'){c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}
   T.pitcherLevel=Math.max(T.pitcherLevel,.6);T.serveList=[c];T.serveAnim={i:0,t:0};T.serving=1;T.pitRest=T.pitRest||T.pitcher.position.clone();
@@ -2568,13 +2583,14 @@ function clipCamWalls(look,pos){for(const W of CAM_WALLS){if(W.hole&&Math.abs(lo
 const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();ray.layers.enableAll();
 const pickTargets=[floor,TERRAIN,...walkProxies];
 const pointers=new Map();let drag=null,pinch=null;
+const TABLE_ZOOM_MIN=1.25;   // seated at a tea table you may pinch (or scroll) in close to the tea set
 function pick(ev){const r=canvas.getBoundingClientRect();ndc.set((ev.clientX-r.left)/r.width*2-1,-(ev.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);}
-canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+canvas.addEventListener('pointerdown',e=>{try{canvas.setPointerCapture(e.pointerId);}catch(x){}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pointers.size===1)drag={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,t:performance.now(),moved:false};
   if(pointers.size===2){const[a,b]=[...pointers.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),dist:cam.dist};if(drag)drag.moved=true;}});
 canvas.addEventListener('pointermove',e=>{
   if(pointers.has(e.pointerId))pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pinch&&pointers.size===2){const[a,b]=[...pointers.values()];cam.dist=clamp(pinch.dist*pinch.d/Math.max(Math.hypot(a.x-b.x,a.y-b.y),1),isTouch?3.6:2.4,16);return;}
+  if(pinch&&pointers.size===2){const[a,b]=[...pointers.values()];cam.dist=clamp(pinch.dist*pinch.d/Math.max(Math.hypot(a.x-b.x,a.y-b.y),1),me.seat?TABLE_ZOOM_MIN:(isTouch?3.6:2.4),16);return;}
   if(drag&&pointers.size===1){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
     if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>6){drag.moved=true;canvas.classList.add('dragging');}
     if(drag.moved){if(cam.mode!=='follow')setMode('follow');cam.yaw-=dx*(isTouch?.0042:.0058);cam.pitch=clamp(cam.pitch+dy*(isTouch?.003:.004),isTouch?.04:-.12,1.2);}return;}
@@ -2594,11 +2610,15 @@ function endPointer(e){
         }}
     drag=null;}}
 canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',endPointer);
-canvas.addEventListener('wheel',e=>{e.preventDefault();cam.dist=clamp(cam.dist*(1+Math.sign(e.deltaY)*.1),2.4,16);},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();cam.dist=clamp(cam.dist*(1+Math.sign(e.deltaY)*.1),me.seat?TABLE_ZOOM_MIN:2.4,16);},{passive:false});
 
 /* ---------- NPC tea service ---------- */
 function startServe(T){T.ready=false;T.serveList=T.cups.filter(c=>c&&c.k>0&&c.state==='host'&&seatOf(T,c.k).occ);if(!T.serveList.length)T.serveList=T.soloPour?[]:T.cups.filter(c=>c&&c.k>0&&c.state==='host');T.soloPour=false;
   {const hc=T.cups[0];if(seatOf(T,0).occ&&hc.state!=='toGuest'&&hc.state!=='toHost'&&hc.level<.5){hc.state='host';hc.rest=hc.hostPos.clone();hc.g.position.copy(hc.rest);T.serveList.push(hc);}}T.serveAnim={i:0,t:0};T.serving=1;T.pitRest=T.pitRest||T.pitcher.position.clone();}
+// a guest leaves: the cup they were drinking from stays put for 3 seconds, then disappears (on every screen)
+function vanishCup(c){if(c&&c.k>0&&(c.state==='guest'||c.state==='toGuest'))c.vanishAt=performance.now()+3000;}
+// someone sits where the cup had disappeared: an empty cup is set back in front of the host, ready to be filled
+function readyCup(T,k){const c=T&&T.cups[k];if(!c||k===0)return;c.vanishAt=null;if(c.state==='gone'){c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);c.g.quaternion.identity();c.g.visible=true;}}
 function sendCup(c,toGuest){c.state=toGuest?'toGuest':'toHost';c.from=c.g.position.clone();c.to=(toGuest?c.guestPos:c.hostPos).clone();c.mt=0;}
 function updateTable(T,dt){
   updateIncense(T,dt);
@@ -2615,6 +2635,7 @@ function updateTable(T,dt){
       if(A.t>=.5){P.position.copy(T.pitRest);T.serveAnim=null;T.serving=0;T.serveList.forEach((c,i)=>{c.delay=.2+i*.35;});T.passing=T.serveList;}}}
   if(T.passing){for(const c of T.passing){if(c.delay>0){c.delay-=dt;if(c.delay<=0)sendCup(c,!!seatOf(T,c.k).occ);}}if(T.passing.every(c=>c.delay<=0))T.passing=null;}
   for(let k=0;k<NSEAT;k++){const c=T.cups[k];
+    if(c.vanishAt&&performance.now()>=c.vanishAt){c.vanishAt=null;if(!seatOf(T,k).occ){c.state='gone';c.level=0;c.g.visible=false;}}
     if(c.state==='toGuest'||c.state==='toHost'){c.mt+=dt/.9;const q=ease(Math.min(1,c.mt));c.g.position.lerpVectors(c.from,c.to,q);c.g.position.y+=Math.sin(q*Math.PI)*.05;
       if(c.mt>=1){const arrived=c.state==='toGuest';c.state=arrived?'guest':'host';c.rest=c.to.clone();c.g.position.copy(c.rest);
         if(arrived&&c.k>0){const o=seatOf(T,c.k).occ;if(o){startTap(o,c);const g=T.npc&&T.npc.guests.find(x=>x.ch===o);if(g)g.delay=Math.max(g.delay,3);}}}}
@@ -2738,12 +2759,12 @@ function frame(){
   for(let i=ripples.length-1;i>=0;i--){const r=ripples[i];r.t+=dt;const q=r.t/1.4;r.m.scale.setScalar(.2+q*1.6);r.m.material.opacity=.55*(1-q);if(q>=1){scene.remove(r.m);ripples.splice(i,1);}}
   for(const m of mists)m.sp.position.x=m.x0+Math.sin(t*.02+m.v*5)*12;
   // camera
-  {const f=cam.mode==='fp'?42:(isTouch?62:55);if(Math.abs(camera.fov-f)>.1){camera.fov+=(f-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();}}
+  {const f=cam.mode==='fp'?fpFit().fov:(isTouch?62:55);if(Math.abs(camera.fov-f)>.1){camera.fov+=(f-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();}}
   if(cam.mode==='fp'&&me.brew){fpView(tmpPos,tmpLook);}
   else if(cam.mode==='follow'){
     const atTable=me.seat&&me.seat.table&&!me.brew,fz=0,cx0=atTable?lerp(me.seat.table.cx,me.seat.x,fz):me.x,cz0=atTable?lerp(me.seat.table.cz,me.seat.z,fz):me.z;   // phones: aim between the table centre and your own seat, where the tea set is
     const ty=atTable?.82:me.y+(me.seat||me.mode==='boat'?1.05:1.15);tmpLook.set(cx0,ty,cz0);
-    const cp=Math.cos(cam.pitch);let dist=atTable?Math.max(cam.dist,2.2):cam.dist;
+    const cp=Math.cos(cam.pitch);let dist=atTable?Math.max(cam.dist,TABLE_ZOOM_MIN):cam.dist;
     if(inRect(me.x,me.z,ROOM)){const sx=Math.sin(cam.yaw)*cp,sz=Math.cos(cam.yaw)*cp,lim=HALF-.45;
       if(sx>.01)dist=Math.min(dist,(lim-cx0)/sx);if(sx<-.01)dist=Math.min(dist,(-lim-cx0)/sx);if(sz>.01)dist=Math.min(dist,(lim-.4-cz0)/sz);
       dist=Math.min(dist,((atTable?3.4:3.3)-ty)/Math.max(.05,Math.sin(cam.pitch)));dist=Math.max(dist,1.2);}
