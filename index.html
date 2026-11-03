@@ -2109,7 +2109,7 @@ const NET=(()=>{
         for(const P of [...members.values()])drop(P);
         for(const p of m.players)upsert(p);
         m.tables.forEach(tb=>tb.seats.forEach((who,k)=>applySeat(tb.ti,k,who)));
-        if(m.me&&m.me.tea){me.tea=m.me.tea;me.teaLeft=m.me.teaLeft;me.brewedAt=m.me.brewedAt!=null?m.me.brewedAt:null;}
+        if(m.me&&m.me.tea){me.tea=m.me.tea;me.teaLeft=m.me.teaLeft;me.brewedAt=m.me.brewedAt!=null?m.me.brewedAt:null;}else if(me.tea&&me.teaLeft>0)out({t:'tea',key:me.tea,left:me.teaLeft});
         if(m.resumed&&m.me&&m.me.seat&&!me.seat)out({t:'stand'});   // this page starts standing; let go of the old seat
         if(me.seat)out({t:'sit',ti:me.seat.table.i,k:me.seat.k});
         setNameTag(me,nick);setStatus('connected');last='';
@@ -2364,16 +2364,14 @@ ring.rotation.x=-Math.PI/2;ring.visible=false;scene.add(ring);
 const tapMark=new THREE.Mesh(new THREE.RingGeometry(.12,.18,24),new THREE.MeshBasicMaterial({color:0xf3ebde,transparent:true,opacity:0,depthWrite:false}));tapMark.rotation.x=-Math.PI/2;scene.add(tapMark);
 function sitMe(seat){
   if(seat.occ&&seat.occ!==me){toast('이미 다른 분이 앉은 자리예요');return;}
-  if(seat.host&&!me.tea){toast('팽주가 되려면 먼저 찻장에서 차를 골라 주세요');me.route=[];me.seatTarget=null;ring.visible=false;return;}
   if(me.seat)me.seat.occ=null;seatChar(me,seat);me.route=[];me.seatTarget=null;ring.visible=false;NET.sit(seat);
   cam.yaw=Math.atan2(seat.x-seat.table.cx,seat.z-seat.table.cz)+.78;cam.pitch=.34;cam.dist=3.0;
-  const T=seat.table;if(seat.host)setTeaColor(T,me.tea);toast(seat.host?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}를 우려 보세요`:(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
+  const T=seat.table;if(seat.host&&me.tea)setTeaColor(T,me.tea);toast(seat.host?(me.tea?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}를 우려 보세요`:`${tableName(T.i)} 팽주석에 앉았어요. 찻장에서 차를 가져오면 우릴 수 있어요`):(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
 function standMe(){
   if(!me.seat||me.action)return;const s=me.seat;s.occ=null;if(!s.host){const c=s.table.cups[s.k];if(c.state==='guest'||c.state==='toGuest'){c.level=0;sendCup(c,false);}}me.seat=null;setPose(me,'stand');NET.stand();
   const nx=s.x-Math.sin(s.ry)*.6,nz=s.z-Math.cos(s.ry)*.6;me.x=nx;me.z=nz;me.y=0;}
 function goSeat(seat){
   if(me.seat===seat||me.mode==='boat'||me.brew)return;
-  if(seat.host&&!me.tea&&!seat.occ){toast('팽주가 되려면 먼저 찻장에서 차를 골라 주세요');return;}
   if(seat.occ&&seat.occ!==me){toast('이미 다른 분이 앉은 자리예요');return;}
   if(me.seat){if(me.action)return;standMe();}
   const r=planRoute(seat.x,seat.z,seat);if(!r)return;me.route=r;me.seatTarget=seat;me.stuck=0;

@@ -69,7 +69,7 @@ function onMessage(conn, m) {
     case 'tea': {  // picked a tea at the cabinet
       if (p.tea && p.teaLeft > 0) return send(conn.ws, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
       if (typeof m.key !== 'string' || m.key.length > 24) return;
-      p.tea = m.key; p.teaLeft = INFUSIONS; p.brewedAt = null;
+      p.tea = m.key; p.teaLeft = Math.max(1, Math.min(INFUSIONS, (m.left | 0) || INFUSIONS)); p.brewedAt = null;
       broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: null }); break;
     }
     case 'sit': {
@@ -77,7 +77,6 @@ function onMessage(conn, m) {
       if (ti < 0 || ti >= NTABLES || k < 0 || k >= NSEAT) return;
       const holder = c.seats[ti][k];
       if (holder && holder !== p.uid) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'taken' });
-      if (k === 0 && !(p.tea && p.teaLeft > 0)) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'noTea' });
       if (p.seat && (p.seat[0] !== ti || p.seat[1] !== k)) freeSeat(c, p);
       c.seats[ti][k] = p.uid; p.seat = [ti, k];
       if (k === 0) c.tables[ti].tea = p.tea;
