@@ -172,7 +172,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2330</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2340</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2334,7 +2334,7 @@ function openTeaPanel(){const list=$('teaList');list.innerHTML='';
   if(me.tea){const t=TEAS[me.tea];$('teaList').insertAdjacentHTML('beforeend',`<p>지금 ${t.full}${eul(t.full)} 가지고 있어요 (남은 우림 ${me.teaLeft}번). 다 우린 뒤에 새 차를 가져올 수 있어요.</p>`);}
   for(const k of TEA_KEYS){const t=TEAS[k],b=document.createElement('button');b.type='button';b.className='teaItem'+(me.tea===k?' on':'');b.disabled=!!me.tea;
     b.innerHTML=`<i class="sw" style="background:#${t.liquor.toString(16).padStart(6,'0')}"></i><div><b>${t.full}</b><span>${t.han}</span></div>`;
-    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=INFUSIONS;me.brewedAt=null;NET.tea(k);me.route=[];me.backStep={left:1.8,ry:Math.atan2(-1.1-me.x,CAB.z-me.z)};$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}${eul(t.full)} 챙겼어요. 한 번 우리고 다섯 번 더 따를 수 있어요`);canvas.focus();});list.appendChild(b);}
+    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=INFUSIONS;me.brewedAt=null;NET.tea(k);me.route=[];{const out=Math.atan2(-1.1-me.x,CAB.z-me.z)+Math.PI;me.backStep={left:2.25,ry:out,turn:.45};setMode('follow');cam.yaw=out+Math.PI;cam.pitch=.2;}$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}${eul(t.full)} 챙겼어요. 한 번 우리고 다섯 번 더 따를 수 있어요`);canvas.focus();});list.appendChild(b);}
   openCabinetDoors();const tok=teaOpenTok=(teaOpenTok||0)+1;setTimeout(()=>{if(tok===teaOpenTok&&nearCabinet())$('teaPanel').hidden=false;},650);}
 let teaOpenTok=0;
 $('teaClose').addEventListener('click',()=>{$('teaPanel').hidden=true;closeCabinetDoors();canvas.focus();});
@@ -2676,10 +2676,12 @@ function frame(){
   let moving=false;
   if(me.mode==='gaze'&&keys.size)endGaze();
   if(me.mode==='rail'&&keys.size)endRail();
-  // after taking tea from the cabinet: four small steps backwards, still facing the cabinet
+  // after taking tea from the cabinet: turn around and walk five steps away, seen from behind
   if(me.backStep&&(keys.size||me.mode!=='walk'||me.seat))me.backStep=null;
-  if(me.backStep){const B=me.backStep,st=Math.min(B.left,1.35*dt),bx=-Math.sin(B.ry),bz=-Math.cos(B.ry),ox=me.x,oz=me.z;me.ry=lerpAngle(me.ry,B.ry,Math.min(1,dt*10));
-    tryMove(me,me.x+bx*st,me.z+bz*st);B.left-=st;moving=true;if(B.left<=1e-3||Math.hypot(me.x-ox,me.z-oz)<st*.3)me.backStep=null;}
+  if(me.backStep){const B=me.backStep;me.ry=lerpAngle(me.ry,B.ry,Math.min(1,dt*9));cam.yaw=lerpAngle(cam.yaw,B.ry+Math.PI,Math.min(1,dt*4));
+    if(B.turn>0)B.turn-=dt;   // turn around on the spot first
+    else{const st=Math.min(B.left,1.35*dt),ox=me.x,oz=me.z;tryMove(me,me.x+Math.sin(B.ry)*st,me.z+Math.cos(B.ry)*st);B.left-=st;moving=true;   // ~0.45 m a step: five steps
+      if(B.left<=1e-3||Math.hypot(me.x-ox,me.z-oz)<st*.3)me.backStep=null;}}
   else if(me.mode==='walk'){
     let mx=0,mz=0;if(keys.has('w')||keys.has('arrowup'))mz+=1;if(keys.has('s')||keys.has('arrowdown'))mz-=1;if(keys.has('d')||keys.has('arrowright'))mx+=1;if(keys.has('a')||keys.has('arrowleft'))mx-=1;
     const speed=3.2;
