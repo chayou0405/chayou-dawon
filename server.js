@@ -32,7 +32,7 @@ function channel(id) {
   return c;
 }
 const occupancy = c => c.players.size;   // online players + players inside their reconnect grace window
-const pub = p => ({ uid: p.uid, nick: p.nick, look: p.look, st: p.st, online: p.online, seat: p.seat, tea: p.tea, teaLeft: p.teaLeft });
+const pub = p => ({ uid: p.uid, nick: p.nick, look: p.look, st: p.st, online: p.online, seat: p.seat, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
 const tableState = (c, ti) => ({ ti, tea: c.tables[ti].tea, ready: c.tables[ti].ready, cups: c.tables[ti].cups, seats: c.seats[ti] });
 
 function send(ws, m) { if (ws && ws.readyState === 1) wsSend(ws, JSON.stringify(m)); }
@@ -66,10 +66,10 @@ function onMessage(conn, m) {
       broadcast(c, { t: 'st', uid: p.uid, s: p.st }, conn.ws); break;
     }
     case 'tea': {  // picked a tea at the cabinet
-      if (p.tea && p.teaLeft > 0) return send(conn.ws, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft });
+      if (p.tea && p.teaLeft > 0) return send(conn.ws, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
       if (typeof m.key !== 'string' || m.key.length > 24) return;
-      p.tea = m.key; p.teaLeft = INFUSIONS;
-      broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft }); break;
+      p.tea = m.key; p.teaLeft = INFUSIONS; p.brewedAt = null;
+      broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: null }); break;
     }
     case 'sit': {
       const ti = m.ti | 0, k = m.k | 0;
@@ -84,11 +84,11 @@ function onMessage(conn, m) {
       broadcast(c, { t: 'table', ...tableState(c, ti) }); break;
     }
     case 'stand': freeSeat(c, p); break;
-    case 'brewed': {   // host finished an infusion in the fair cup
+    case 'brewed': {   // host serves an infusion: a full brew the first time at a table, afterwards poured from the fair cup
       if (!p.seat || p.seat[1] !== 0 || !(p.teaLeft > 0)) return;
       const ti = p.seat[0], T = c.tables[ti];
-      T.tea = p.tea; T.ready = true; p.teaLeft -= 1; const tea = p.tea; if (p.teaLeft <= 0) p.tea = null;
-      broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft });
+      T.tea = p.tea; T.ready = true; p.teaLeft -= 1; p.brewedAt = ti; const tea = p.tea; if (p.teaLeft <= 0) { p.tea = null; p.brewedAt = null; }
+      broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
       // pouring follows immediately: every seated guest gets a full cup
       const ks = []; for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) { T.cups[k] = 1; ks.push(k); }
       T.ready = false;
@@ -138,7 +138,7 @@ function hello(conn, m) {
   const free = NICKS.filter(n => !used.has(n));
   const nick = free[crypto.randomInt(free.length)];
   p = { uid: crypto.randomUUID(), sid: crypto.randomBytes(18).toString('base64url'), nick, look: (m.look && typeof m.look === 'object') ? m.look : {}, st: null,
-    ws: conn.ws, online: true, graceTimer: null, seat: null, tea: null, teaLeft: 0 };
+    ws: conn.ws, online: true, graceTimer: null, seat: null, tea: null, teaLeft: 0, brewedAt: null };
   c.players.set(p.uid, p); c.bySid.set(p.sid, p.uid); conn.c = c; conn.p = p;
   send(conn.ws, { t: 'welcome', resumed: false, uid: p.uid, sid: p.sid, nick, ch: id, cap: CAP, me: pub(p), players: [...c.players.values()].filter(q => q !== p).map(pub), tables: c.tables.map((_, ti) => tableState(c, ti)) });
   broadcast(c, { t: 'enter', p: pub(p) }, conn.ws);
