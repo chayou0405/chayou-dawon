@@ -35,6 +35,7 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 .brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.06em;line-height:1.15;display:flex;align-items:baseline;gap:8px}
 .brand h1 small{font-size:13px;font-weight:400;color:var(--muted);letter-spacing:.2em}
 .brand p{margin:4px 0 0;font-size:12px;color:var(--muted);letter-spacing:.02em}
+.brand p{display:none}
 .actions{display:flex;gap:8px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end}
 button{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--glass);border:1px solid var(--line);border-radius:4px;
   padding:9px 14px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-height:40px}
@@ -93,8 +94,11 @@ button:disabled{opacity:.5;cursor:default}
 @keyframes glow{0%,100%{transform:scale(1);opacity:.9}30%{transform:scale(1.07);opacity:1}55%{transform:scale(.95);opacity:.78}80%{transform:scale(1.04);opacity:.95}}
 #loading.done{opacity:0;pointer-events:none}
 @media (max-width:560px){
-  .brand p:not(#netInfo){display:none}
+  .top{flex-wrap:nowrap;align-items:center}
+  .top .actions{flex-wrap:nowrap}
+  .desk-only{display:none!important}
   .brand{padding:8px 12px 9px}
+  .brand h1 small{display:none}
   #toast{font-size:12px;padding:6px 12px;top:max(70px,calc(env(safe-area-inset-top,0px) + 64px))}
   .brand h1{font-size:19px}
   .brand p{font-size:11px}
@@ -112,7 +116,7 @@ button:disabled{opacity:.5;cursor:default}
       <p id="netInfo" aria-live="polite">채널에 연결하는 중…</p>
     </div>
     <div class="actions">
-      <button id="goBtn" type="button">나루터로 가기</button>
+      <button id="goBtn" type="button" class="desk-only">나루터로 가기</button>
       <button id="soundBtn" type="button">소리 켜기</button>
       <button id="nightBtn" type="button">밤으로</button>
     </div>
@@ -124,7 +128,7 @@ button:disabled{opacity:.5;cursor:default}
     </div>
     <div class="actions">
       <button id="actBtn" class="primary" type="button" hidden></button>
-      <button id="waitBtn" type="button" hidden>같이 탈 사람 기다리기</button>
+      <button id="waitBtn" type="button" hidden>함께 타기</button>
       <button id="toastBtn" type="button" hidden>함께 한 모금</button>
       <button id="incenseBtn" type="button" hidden>향 피우기</button>
       <button id="moodBtn" type="button" hidden>마음 표현하기</button>
@@ -1801,14 +1805,14 @@ function updateChar(ch,dt,moving){
 const HOST_LOOKS=[
   {jacket:true,robe:'#2c2622',motif:'#b39a6c',style:'top',face:'round',trousers:0xcdbfa6},
   {jacket:true,robe:'#3a3330',motif:'#c2ab80',style:'bun',face:'lash',trousers:0xd6cbb6,bead:0x9fd0b0},
-  {jacket:true,robe:'#433528',motif:'#cfb486',style:'top',face:'smile',trousers:0xcabda4},
+  {jacket:true,robe:'#433528',motif:'#cfb486',style:'top',face:'round',trousers:0xcabda4},
   {jacket:true,robe:'#2e3330',motif:'#a9b49a',style:'bun',face:'round',trousers:0xd2c8b4}];
 const NPC_LOOKS=[
   {robe:'#c9a35e',trim:'#8a6a3a',style:'bun',face:'lash',motif:'rgba(255,240,200,.5)'},{robe:'#d9d6cf',trim:'#8d8a84',style:'top',face:'round'},
   {robe:'#3e5b78',trim:'#d9c9a3',style:'top',face:'round'},{robe:'#c9a3b8',trim:'#7a3b5b',style:'bun',face:'lash',bead:0x6ea4c4},
-  {robe:'#789262',trim:'#3d4f2e',style:'bun',face:'smile'},{robe:'#9d2933',trim:'#e6c27a',style:'top',face:'round',crown:0xc59a3b},
-  {robe:'#d6e4ea',trim:'#4a6a86',style:'bun',face:'lash'},{robe:'#574266',trim:'#d7bfe0',style:'top',face:'smile'},
-  {robe:'#c8a44e',trim:'#5a3b1f',style:'bun',face:'round'},{robe:'#3c6e8f',trim:'#f0e2c6',style:'bun',face:'smile',bead:0xe3a33f},
+  {robe:'#789262',trim:'#3d4f2e',style:'bun',face:'round'},{robe:'#9d2933',trim:'#e6c27a',style:'top',face:'round',crown:0xc59a3b},
+  {robe:'#d6e4ea',trim:'#4a6a86',style:'bun',face:'lash'},{robe:'#574266',trim:'#d7bfe0',style:'top',face:'round'},
+  {robe:'#c8a44e',trim:'#5a3b1f',style:'bun',face:'round'},{robe:'#3c6e8f',trim:'#f0e2c6',style:'bun',face:'round',bead:0xe3a33f},
   {robe:'#f1ece0',trim:'#8e2a20',style:'top',face:'round'},{robe:'#5e616d',trim:'#c9b28a',style:'top',face:'lash'},
   {robe:'#8f5a46',trim:'#e9d7b2',style:'bun',face:'round'},{robe:'#4d7a6e',trim:'#e4d4a8',style:'bun',face:'lash'},
 ];
@@ -1821,7 +1825,7 @@ for(const[ti,ks]of Object.entries(NPC_TABLES)){const T=tables[ti];T.npc={host:nu
 for(const T of tables)for(let k=0;k<NSEAT;k++)T.cups[k].T=T;
 
 const ME_GENDER=(()=>{try{return sessionStorage.getItem('chayou-gender');}catch(e){return null;}})();
-const ME_LOOK={robe:['#7fa596','#c9a35e','#8f5a46','#3e5b78','#c9a3b8','#789262','#d6e4ea','#574266'][Math.floor(Math.random()*8)],trim:'#f3ead6',style:ME_GENDER==='m'?'top':'bun',face:['round','smile','lash'][Math.floor(Math.random()*(ME_GENDER==='m'?2:3))],hairColor:0x2a1e18,bead:0xf2c14e};
+const ME_LOOK={robe:['#7fa596','#c9a35e','#8f5a46','#3e5b78','#c9a3b8','#789262','#d6e4ea','#574266'][Math.floor(Math.random()*8)],trim:'#f3ead6',style:ME_GENDER==='m'?'top':'bun',face:ME_GENDER==='m'?'round':['round','lash'][Math.floor(Math.random()*2)],hairColor:0x2a1e18,bead:0xf2c14e};
 const me=makeChar(ME_LOOK);
 me.isPlayer=true;me.x=0;me.z=-PLAT-STAIR_L-.6;me.y=groundY(me.x,me.z);me.ry=Math.PI;scene.add(me.root);
 me.mode='walk';me.route=[];me.seatTarget=null;me.stuck=0;
@@ -1841,7 +1845,7 @@ function makeFerry(){
   add(cyl(.03,.03,1.2,6),MAT.woodDark,0,.9,4.6,g);
   const lg=new THREE.Group();lg.position.set(0,1.35,4.6);g.add(lg);add(lanternGeo,MAT.lantern,0,0,0,lg).scale.setScalar(.6);
   const sp=new THREE.Sprite(glowMat.clone());sp.scale.set(1.6,1.6,1);lg.add(sp);glows.push({sp,ph:rnd()*6});
-  const man=makeChar({robe:'#6d5a43',trim:'#3a2f24',style:'hat',face:'smile',trousers:0x4a4037});man.root.position.set(0,.33,-4.2);g.add(man.root);
+  const man=makeChar({robe:'#6d5a43',trim:'#3a2f24',style:'hat',face:'round',trousers:0x4a4037});man.root.position.set(0,.33,-4.2);g.add(man.root);
   const pole=add(cyl(.022,.022,3.4,6),MAT.bamboo,0,0,0,man.root);man.action={type:'pole',t:rnd()*4,pole};
   return{g,man,seat:new V3(0,.3,1.16)};
 }
@@ -2122,6 +2126,7 @@ const NET=(()=>{const CAP=88,GRACE=60000,APP='chayou-dawon-2026',KEY='chayou-ses
         c.root.updateMatrixWorld(true);updateChar(c,dt,!!M.m&&M.pose==='stand');}
       if(phase!=='in'||!send.st)return;sendT-=dt;const st=myState(),key=JSON.stringify(st);if(sendT<=0&&(key!==last||sendT<-1)){send.st(st);last=key;sendT=.12;}},
     mood(e){if(phase==='in'&&send.mood)send.mood(e);},
+    others(){return[...members.values()].filter(M=>M.c&&M.seen).map(M=>({x:M.tx,z:M.tz,nick:M.nick}));},
     get uid(){return uid;},get nick(){return nick;}
   };})();
 // entry: pick 여성/남성 once per session (a reload restores the choice), then join the channel
@@ -2146,11 +2151,11 @@ function updateHud(){
   const goLabel=(where==='dock'||where==='stones')?'다실로 돌아가기':'나루터로 가기';
   $('moodBtn').hidden=false;{const T=me.seat&&me.seat.table,ib=$('incenseBtn'),busy=!!(T&&(T.incense||T.incensePending));ib.hidden=!(me.seat&&!me.brew);ib.disabled=busy||!!me.action;ib.textContent=busy?'향이 타고 있어요':'향 피우기';}
   let together=false;if(me.seat&&!me.brew){const T=me.seat.table;together=[0,1,2,3,4].every(k=>{const c=T.cups[k],o=seatOf(T,k).occ;return o&&c.state==='guest'&&c.level>.5&&!(o.action&&o.action.type!=='tap');});}
-  const feed=canFeed();const gaze=canGaze();const lan=canLantern(),skp=canSkip(),ofr=nearCourtCenser();const gd=guide.active&&me.mode==='walk'&&!me.seat&&!nearCabinet();const key=(lan?'L':'')+(skp?'K':'')+(ofr?'O':'')+(gd?'G':'')+(me.seat&&me.seat.table.incense?'i':'')+(me.action?'a':'')+status+act+stand+goLabel+busy+feed+snack+together+placeNow()+gaze;if(key===lastHud)return;lastHud=key;$('gazeBtn').hidden=!gaze;$('guideBtn').hidden=!gd;$('lanternBtn').hidden=!lan;$('skipBtn').hidden=!skp;{const ob=$('offerBtn');ob.hidden=!ofr;if(ofr){ob.disabled=!!me.action;ob.textContent='향로에 향 피우기';}}$('toastBtn').hidden=!together;$('feedBtn').hidden=!feed;$('waitBtn').hidden=true;$('snackBtn').hidden=!snack;
+  const feed=canFeed();const gaze=canGaze();const lan=canLantern(),skp=canSkip(),ofr=nearCourtCenser();const gd=guide.active&&me.mode==='walk'&&!me.seat&&!nearCabinet();const key=(lan?'L':'')+(skp?'K':'')+(ofr?'O':'')+(gd?'G':'')+(me.seat&&me.seat.table.incense?'i':'')+(me.action?'a':'')+status+act+stand+goLabel+busy+feed+snack+together+placeNow()+gaze;if(key===lastHud)return;lastHud=key;$('gazeBtn').hidden=!gaze;$('guideBtn').hidden=!gd;$('lanternBtn').hidden=!lan;$('skipBtn').hidden=!skp;{const ob=$('offerBtn');ob.hidden=!ofr;if(ofr){ob.disabled=!!me.action;ob.textContent='향로에 향 피우기';}}$('toastBtn').hidden=!together;$('feedBtn').hidden=!feed;$('waitBtn').hidden=!(me.mode==='walk'&&!me.seat&&placeNow()==='dock');$('snackBtn').hidden=!snack;
   $('statusText').textContent=status;$('chip').classList.toggle('busy',busy);
   $('actBtn').hidden=!act;$('actBtn').textContent=act;$('standBtn').hidden=!stand;$('standBtn').textContent=stand;$('goBtn').textContent=goLabel;$('goBtn').disabled=me.mode==='boat';
 }
-let toastTimer=0;function toast(t){const el=$('toast');if(isTouch)t=String(t).split(/ · |\. |\n/)[0].replace(/\.$/,'');el.textContent=t;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);}
+let toastTimer=0;function toast(t){const el=$('toast');{const tb=document.querySelector('#ui .top');if(tb){let y=0;for(const c of tb.children){const r=c.getBoundingClientRect();if(r.height)y=Math.max(y,r.bottom);}el.style.top=Math.round(y+8)+'px';}}if(isTouch)t=String(t).split(/ · |\. |\n/)[0].replace(/\.$/,'');el.textContent=t;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);}
 
 /* ---------- feeding the koi ---------- */
 const pellets=[],ripples=[];let feeding=null;
@@ -2336,9 +2341,14 @@ function boardFerry(wait){const fr=POOL.find(Q=>Q.state==='berth'&&Q.slot===BERT
   if(!R){toast('뗏목이 나루터로 들어오는 중이에요. 잠시만 기다려 주세요');return;}
   me.boat=R;ferry=R.r;me.mode='boat';me.route=[];ring.visible=false;setPose(me,'sit',.42);ride={u:0,t:0,active:false,waiting:!!wait,wt:0};
   if(water)me.root.layers.set(0);setMode('follow');cam.yaw=R.slot.ry+Math.PI;me.x=R.r.g.position.x;me.z=R.r.g.position.z;lastHud='';
-  if(wait){toast('같이 탈 사람을 기다려요');const c=makeChar(NPC_LOOKS[Math.floor(rnd()*NPC_LOOKS.length)]);c.x=0;c.z=STONES_Z0+1;c.y=LAKE.y+.13;c.ry=Math.PI;scene.add(c.root);companion={ch:c,phase:'walk',R};}
+  if(wait==='people'){toast('나룻배에서 함께 탈 분을 기다려요');ride.waitT=0;}
+  else if(wait){toast('함께 탈 분이 없어 다른 손님과 같이 타요');const c=makeChar(NPC_LOOKS[Math.floor(rnd()*NPC_LOOKS.length)]);c.x=0;c.z=STONES_Z0+1;c.y=LAKE.y+.13;c.ry=Math.PI;scene.add(c.root);companion={ch:c,phase:'walk',R};}
   else{R.wantGo=true;if(startTrip(R))toast('대나무 뗏목을 타고 호수를 한 바퀴 돌아요');else toast(R.slot===BERTH_A?'네 개의 뱃길이 모두 운행 중이에요. 하나가 비면 바로 출발해요':'앞 뗏목이 떠나면 바로 출발해요');}}
-function updateCompanion(dt){if(!companion)return;const C=companion,c=C.ch;
+function updateCompanion(dt){
+  // waiting aboard for other players: leave once one of them comes alongside, or after 40 s
+  if(me.mode==='boat'&&ride.waiting&&!companion&&me.boat&&me.boat.state==='berth'){ride.waitT=(ride.waitT||0)+dt;const g=me.boat.r.g.position;
+    const came=NET.others().some(o=>Math.hypot(o.x-g.x,o.z-g.z)<3);if(came||ride.waitT>40){ride.waiting=false;me.boat.wantGo=true;lastHud='';toast(came?'함께 탔어요. 출발해요':'출발해요');startTrip(me.boat);}}
+  if(!companion)return;const C=companion,c=C.ch;
   if(C.phase==='walk'){const bx=clamp(C.R.r.g.position.x,DOCK.x0+.4,DOCK.x1-.4),tg=Math.abs(c.z-(DOCK.z0+.4))>.05?[0,DOCK.z0+.4]:[bx,DOCK.z0+.4],dx=tg[0]-c.x,dz=tg[1]-c.z,d=Math.hypot(dx,dz);
     if(d>.05){const st=Math.min(d,2.4*dt);c.x+=dx/d*st;c.z+=dz/d*st;c.ry=Math.atan2(dx,dz);const s=surfaceAt(c.x,c.z);if(s)c.y=s.y;updateChar(c,dt,true);}
     else{C.phase='board';scene.remove(c.root);ferry.g.add(c.root);c.root.position.copy(ferry.seat2);c.root.rotation.set(0,0,0);setPose(c,'sit',.42);ride.waiting=false;C.R.wantGo=true;lastHud='';
@@ -2367,12 +2377,15 @@ const moodTexCache={};function moodTex(e){return moodTexCache[e]||(moodTexCache[
 const bubbles=[];
 function setFace(ch,kind){const f=ch.headPivot.userData.face;if(f){f.material.map=f.material.emissiveMap=faceTex(kind||ch.headPivot.userData.faceKind);f.material.needsUpdate=true;}}
 function showMood(ch,e){if(ch.bubble){scene.remove(ch.bubble.sp);setFace(ch);}const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:moodTex(e),transparent:true,depthTest:false}));const bs=isTouch?.58:.29;sp.scale.set(bs,bs,1);sp.renderOrder=20;sp.layers.enableAll();scene.add(sp);ch.bubble={sp,t:0,sad:e==='☁️',face:e==='☁️'?'sad':e==='😊'?'smile':e==='😌'?'calm':null};if(ch.bubble.face)setFace(ch,ch.bubble.face);if(!bubbles.includes(ch))bubbles.push(ch);}
-function updateBubbles(dt){for(let i=bubbles.length-1;i>=0;i--){const ch=bubbles[i],b=ch.bubble;if(!b){bubbles.splice(i,1);continue;}b.t+=dt;ch.headPivot.updateMatrixWorld(true);if(ch.nameTag&&ch.nameTag.visible!==false){ch.nameTag.getWorldPosition(b.sp.position);b.sp.position.y+=.055+b.sp.scale.y*.5+.05+Math.sin(b.t*3)*.02;}else{ch.headPivot.getWorldPosition(b.sp.position);b.sp.position.y+=.72+Math.sin(b.t*3)*.02;}
+function updateBubbles(dt){for(let i=bubbles.length-1;i>=0;i--){const ch=bubbles[i],b=ch.bubble;if(!b){bubbles.splice(i,1);continue;}b.t+=dt;ch.headPivot.updateMatrixWorld(true);if(ch.nameTag&&ch.nameTag.visible!==false){ch.nameTag.getWorldPosition(b.sp.position);b.sp.position.y+=.055+b.sp.scale.y*.26+Math.sin(b.t*3)*.02;}else{ch.headPivot.getWorldPosition(b.sp.position);b.sp.position.y+=.72+Math.sin(b.t*3)*.02;}
   b.sp.material.opacity=b.t<.2?b.t/.2:b.t>3?Math.max(0,1-(b.t-3)/.5):1;if(!ch.action){ch.headPivot.rotation.x=b.sad?.26*Math.min(1,b.t/.6,Math.max(0,(3.5-b.t)/.5)):(b.t<1.4?.22*Math.max(0,Math.sin(b.t*Math.PI*2.2)):0);ch.headPivot.rotation.z=b.sad?.12*Math.min(1,b.t/.6,Math.max(0,(3.5-b.t)/.5)):0;}if(b.t>3.5){scene.remove(b.sp);if(b.face)setFace(ch);ch.bubble=null;bubbles.splice(i,1);}}}
 {const bar=$('moodBar');for(const[e,label]of MOODS){const bt=document.createElement('button');bt.type='button';bt.textContent=e;bt.setAttribute('aria-label',label);bt.title=label;
   bt.addEventListener('click',()=>{showMood(me,e);NET.mood(e);bar.hidden=true;canvas.focus();});bar.appendChild(bt);}}
 $('moodBtn').addEventListener('click',()=>{$('moodBar').hidden=!$('moodBar').hidden;});
-$('waitBtn').addEventListener('click',()=>{if(me.mode==='walk'&&placeNow()==='dock')boardFerry(true);canvas.focus();});
+// 함께 타기: with other players on the landing you wait aboard for them; alone, an NPC companion comes along
+const onDock=(x,z)=>x>=DOCK.x0-.2&&x<=DOCK.x1+.2&&z>=DOCK.z0-.3&&z<=DOCK.z1+.2;
+$('waitBtn').addEventListener('click',()=>{if(!(me.mode==='walk'&&placeNow()==='dock'))return;const others=NET.others().filter(o=>onDock(o.x,o.z));
+  if(others.length>=1)boardFerry('people');else boardFerry(true);canvas.focus();});
 $('toastBtn').addEventListener('click',()=>{if(!me.seat)return;const T=me.seat.table;for(let k=0;k<NSEAT;k++){const o=seatOf(T,k).occ,c=T.cups[k];if(o){if(o.action&&o.action.type==='pour')continue;clearAction(o);startDrink(o,c);const g=T.npc&&T.npc.guests.find(x=>x.ch===o);if(g)g.delay=6;}}toast('다 함께 한 모금');lastHud='';canvas.focus();});
 $('snackBtn').addEventListener('click',()=>{if(me.seat&&!me.action)startSnack(me);canvas.focus();});
 $('standBtn').addEventListener('click',()=>{if(me.mode==='boat'){leaveFerry();}else if(me.mode==='gaze')endGaze();else if(me.mode==='rail')endRail();else standMe();canvas.focus();});
@@ -2396,8 +2409,8 @@ $('goBtn').addEventListener('click',()=>{const w=placeNow();if(me.seat&&me.actio
   if(w==='dock'||w==='stones')walkTo(0,-HALF+3);else walkTo(0,(DOCK.z0+DOCK.z1)/2);setMode('follow');});
 
 /* ---------- camera & input ---------- */
-const cam={yaw:Math.PI,pitch:.1,dist:isTouch?6.4*.8:5.6,mode:'follow'};
-const camPos=new V3(me.x,me.y+1.15+Math.sin(.1)*cam.dist,me.z-cam.dist),camLook=new V3(me.x,me.y+1.15+.9,me.z);
+const cam={yaw:Math.PI,pitch:.1,dist:isTouch?2.4:5.6,mode:'follow'};
+const camPos=new V3(me.x,me.y+(isTouch?.68:1.15)+Math.sin(.1)*cam.dist,me.z-cam.dist),camLook=new V3(me.x,me.y+(isTouch?.68+.2:1.15+.9),me.z);
 function setMode(m){if(me.brew)return;cam.mode=m;}
 const keys=new Set();
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;const k=e.key.toLowerCase();
@@ -2581,16 +2594,16 @@ function frame(){
   for(let i=ripples.length-1;i>=0;i--){const r=ripples[i];r.t+=dt;const q=r.t/1.4;r.m.scale.setScalar(.2+q*1.6);r.m.material.opacity=.55*(1-q);if(q>=1){scene.remove(r.m);ripples.splice(i,1);}}
   for(const m of mists)m.sp.position.x=m.x0+Math.sin(t*.02+m.v*5)*12;
   // camera
-  {const f=cam.mode==='fp'?42:(isTouch?62:55);if(Math.abs(camera.fov-f)>.1){camera.fov+=(f-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();}}
+  {const f=cam.mode==='fp'?42:(isTouch?(me.seat&&me.seat.table&&!me.brew?34:62):55);if(Math.abs(camera.fov-f)>.1){camera.fov+=(f-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();}}
   if(cam.mode==='fp'&&me.brew){fpView(tmpPos,tmpLook);}
   else if(cam.mode==='follow'){
     const atTable=me.seat&&me.seat.table&&!me.brew,fz=isTouch?.4:0,cx0=atTable?lerp(me.seat.table.cx,me.seat.x,fz):me.x,cz0=atTable?lerp(me.seat.table.cz,me.seat.z,fz):me.z;   // phones: aim between the table centre and your own seat, where the tea set is
-    const ty=atTable?.82:me.y+(me.seat||me.mode==='boat'?1.05:1.15);tmpLook.set(cx0,ty,cz0);
+    const ty=atTable?.82:me.y+(isTouch?(me.seat||me.mode==='boat'?.62:.68):(me.seat||me.mode==='boat'?1.05:1.15));tmpLook.set(cx0,ty,cz0);   // phones aim at the body so the character is framed whole
     const cp=Math.cos(cam.pitch);let dist=atTable?(isTouch?Math.max(cam.dist*.5,1.1):Math.max(cam.dist,2.2)):cam.dist;
     if(inRect(me.x,me.z,ROOM)){const sx=Math.sin(cam.yaw)*cp,sz=Math.cos(cam.yaw)*cp,lim=HALF-.45;
       if(sx>.01)dist=Math.min(dist,(lim-cx0)/sx);if(sx<-.01)dist=Math.min(dist,(-lim-cx0)/sx);if(sz>.01)dist=Math.min(dist,(lim-.4-cz0)/sz);
       dist=Math.min(dist,((atTable?3.4:3.3)-ty)/Math.max(.05,Math.sin(cam.pitch)));dist=Math.max(dist,1.2);}
-    tmpPos.set(cx0+Math.sin(cam.yaw)*cp*dist,ty+Math.sin(Math.max(cam.pitch,.06))*dist,cz0+Math.cos(cam.yaw)*cp*dist);tmpLook.y+=Math.max(0,.3-cam.pitch)*4.5;
+    tmpPos.set(cx0+Math.sin(cam.yaw)*cp*dist,ty+Math.sin(Math.max(cam.pitch,.06))*dist,cz0+Math.cos(cam.yaw)*cp*dist);tmpLook.y+=Math.max(0,.3-cam.pitch)*(isTouch&&!atTable?1.0:4.5);
     if(inRect(me.x,me.z,ROOM)){tmpPos.y=Math.min(tmpPos.y,3.4);tmpPos.x=clamp(tmpPos.x,-HALF+.4,HALF-.4);tmpPos.z=clamp(tmpPos.z,-HALF-6,HALF-.45);}
     // after letting a sky lantern go, keep it in view until it fades out of sight
     if(lanternWatch){if(!lanternWatch.g.parent||me.mode!=='walk'||me.seat||keys.size||(drag&&drag.moved))lanternWatch=null;else{const P=lanternWatch.g.position,dx=P.x-me.x,dz=P.z-me.z,l=Math.hypot(dx,dz)||1;
