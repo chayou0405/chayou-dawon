@@ -2265,11 +2265,14 @@ $('nightBtn').addEventListener('click',()=>{nightTarget=nightTarget?0:1;$('night
 
 /* ---------- tea cabinet & first-person brewing ---------- */
 function nearCabinet(){return inRect(me.x,me.z,ROOM)&&me.z>HALF-2.6&&me.x>CAB.x0-.3&&me.x<CAB.x1+.3;}
+// 을/를 after a tea name, depending on whether its last syllable has a final consonant (용정을, 보이숙차를)
+const eul=w=>{const c=String(w).trim().slice(-1).charCodeAt(0)-0xAC00;return c>=0&&c<11172&&c%28?'을':'를';};
+const INFUSIONS=6;   // per tea from the cabinet: the first brew plus 5 more
 function openTeaPanel(){const list=$('teaList');list.innerHTML='';
-  if(me.tea){const t=TEAS[me.tea];$('teaList').insertAdjacentHTML('beforeend',`<p>지금 ${t.full}를 가지고 있어요 (남은 우림 ${me.teaLeft}번). 다 우린 뒤에 새 차를 가져올 수 있어요.</p>`);}
+  if(me.tea){const t=TEAS[me.tea];$('teaList').insertAdjacentHTML('beforeend',`<p>지금 ${t.full}${eul(t.full)} 가지고 있어요 (남은 우림 ${me.teaLeft}번). 다 우린 뒤에 새 차를 가져올 수 있어요.</p>`);}
   for(const k of TEA_KEYS){const t=TEAS[k],b=document.createElement('button');b.type='button';b.className='teaItem'+(me.tea===k?' on':'');b.disabled=!!me.tea;
     b.innerHTML=`<i class="sw" style="background:#${t.liquor.toString(16).padStart(6,'0')}"></i><div><b>${t.full}</b><span>${t.han}</span></div>`;
-    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=3;me.brewedAt=null;NET.tea(k);me.route=[];me.backStep={left:1.8,ry:Math.atan2(-1.1-me.x,CAB.z-me.z)};$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}를 챙겼어요. 세 번 우릴 수 있어요`);canvas.focus();});list.appendChild(b);}
+    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=INFUSIONS;me.brewedAt=null;NET.tea(k);me.route=[];me.backStep={left:1.8,ry:Math.atan2(-1.1-me.x,CAB.z-me.z)};$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}${eul(t.full)} 챙겼어요. 한 번 우리고 다섯 번 더 따를 수 있어요`);canvas.focus();});list.appendChild(b);}
   openCabinetDoors();const tok=teaOpenTok=(teaOpenTok||0)+1;setTimeout(()=>{if(tok===teaOpenTok&&nearCabinet())$('teaPanel').hidden=false;},650);}
 let teaOpenTok=0;
 $('teaClose').addEventListener('click',()=>{$('teaPanel').hidden=true;closeCabinetDoors();canvas.focus();});
@@ -2292,13 +2295,13 @@ function brewNext(){const b=me.brew,T=b.T;
   else if(b.step==='closed'){b.step='pouring';b.t=0;T.busy=true;}
   else if(b.step==='poured'){me.brew=null;cam.mode='follow';me.root.visible=true;$('brewCap').hidden=true;T.ready=true;T.potWater.visible=false;
     NET.brewed();me.teaLeft--;me.brewedAt=T.i;const nm=TEAS[me.tea].name;if(me.teaLeft<=0){me.tea=null;me.brewedAt=null;}
-    if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`${nm}를 손님들께 따라 드려요 · ${me.teaLeft}번 남음`:`${nm}를 손님들께 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
+    if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`${nm}${eul(nm)} 손님들께 따라 드려요 · ${me.teaLeft}번 남음`:`${nm}${eul(nm)} 손님들께 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
     else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);}
   lastHud='';}
 // the leaves were already brewed at this table: the next infusion is simply poured from the fair cup into the guests' cups
 function pourAgain(T){if(!me.tea||me.teaLeft<=0)return;NET.brewed();me.teaLeft--;const nm=TEAS[me.tea].name;if(me.teaLeft<=0){me.tea=null;me.brewedAt=null;}
   T.pitcherLevel=1;T.ready=false;
-  if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`공도배의 ${nm}를 따라 드려요 · ${me.teaLeft}번 남음`:`마지막 ${nm}를 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
+  if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`공도배의 ${nm}${eul(nm)} 따라 드려요 · ${me.teaLeft}번 남음`:`마지막 ${nm}${eul(nm)} 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
   else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);lastHud='';}
 const POT_PROF=[[0,.05],[.02,.068],[.048,.078],[.072,.072],[.09,.055],[.1,.037]];
 function potR(y){for(let i=1;i<POT_PROF.length;i++){const[a,ra]=POT_PROF[i-1],[b,rb]=POT_PROF[i];if(y<=b)return lerp(ra,rb,clamp((y-a)/(b-a),0,1));}return .037;}
@@ -2360,12 +2363,14 @@ function sitMe(seat){
   if(seat.occ&&seat.occ!==me){toast('이미 다른 분이 앉은 자리예요');return;}
   if(me.seat)me.seat.occ=null;seatChar(me,seat);me.route=[];me.seatTarget=null;ring.visible=false;NET.sit(seat);
   cam.yaw=Math.atan2(seat.x-seat.table.cx,seat.z-seat.table.cz)+.78;cam.pitch=.34;cam.dist=3.0;
-  const T=seat.table;if(seat.host&&me.tea)setTeaColor(T,me.tea);toast(seat.host?(me.tea?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}를 우려 보세요`:`${tableName(T.i)} 팽주석에 앉았어요. 찻장에서 차를 가져오면 우릴 수 있어요`):(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
+  if(seat.host&&!me.tea){toast('팽주가 되려면 먼저 찻장에서 차를 가져와 주세요');me.route=[];me.seatTarget=null;ring.visible=false;return;}
+  const T=seat.table;if(seat.host&&me.tea)setTeaColor(T,me.tea);toast(seat.host?(me.tea?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}${eul(TEAS[me.tea].name)} 우려 보세요`:`${tableName(T.i)} 팽주석에 앉았어요. 찻장에서 차를 가져오면 우릴 수 있어요`):(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
 function standMe(){
   if(!me.seat||me.action)return;const s=me.seat;s.occ=null;if(!s.host){const c=s.table.cups[s.k];if(c.state==='guest'||c.state==='toGuest'){c.level=0;sendCup(c,false);}}me.seat=null;setPose(me,'stand');NET.stand();
   const nx=s.x-Math.sin(s.ry)*.6,nz=s.z-Math.cos(s.ry)*.6;me.x=nx;me.z=nz;me.y=0;}
 function goSeat(seat){
   if(me.seat===seat||me.mode==='boat'||me.brew)return;
+  if(seat.host&&!me.tea&&!seat.occ){toast('팽주가 되려면 먼저 찻장에서 차를 가져와 주세요');return;}
   if(seat.occ&&seat.occ!==me){toast('이미 다른 분이 앉은 자리예요');return;}
   if(me.seat){if(me.action)return;standMe();}
   const r=planRoute(seat.x,seat.z,seat);if(!r)return;me.route=r;me.seatTarget=seat;me.stuck=0;
@@ -2377,7 +2382,7 @@ function walkTo(x,z){me.pending=null;if(me.mode==='boat')return;
 function doAct(){
   if(me.brew){brewNext();return;}
   if(me.seat&&!me.action){const s=me.seat,T=s.table;
-    if(s.host){if(T.busy||T.serving>0||T.passing)return;if(!T.ready&&T.cups[0].state==='guest'&&T.cups[0].level>.1){startDrink(me,T.cups[0]);return;}if(T.ready){if(!T.cups.some(c=>c&&c.k>0&&c.state==='host')){toast('앞에 놓인 찻잔이 없어요');return;}startServe(T);toast(`${TEAS[T.teaType].name}를 손님들께 따라 드려요`);}else{if(!me.tea){toast('차를 다 우렸어요. 찻장에서 새 차를 가져와 주세요');return;}if(me.teaLeft>0&&me.brewedAt===T.i){pourAgain(T);return;}startBrew(T);}}
+    if(s.host){if(T.busy||T.serving>0||T.passing)return;if(!T.ready&&T.cups[0].state==='guest'&&T.cups[0].level>.1){startDrink(me,T.cups[0]);return;}if(T.ready){if(!T.cups.some(c=>c&&c.k>0&&c.state==='host')){toast('앞에 놓인 찻잔이 없어요');return;}startServe(T);toast(`${TEAS[T.teaType].name}${eul(TEAS[T.teaType].name)} 손님들께 따라 드려요`);}else{if(!me.tea){toast('차를 다 우렸어요. 찻장에서 새 차를 가져와 주세요');return;}if(me.teaLeft>0&&me.brewedAt===T.i){pourAgain(T);return;}startBrew(T);}}
     else{const cup=T.cups[s.k];if(cup.state!=='guest')return;
       if(cup.level>.1){startDrink(me,cup);NET.drink();}
       else{sendCup(cup,false);NET.cupback();toast(seatOf(T,0).occ?'팽주에게 찻잔을 건넸어요':'찻잔을 팽주 자리에 돌려놓았어요. 팽주석이 비어 있어요');}}

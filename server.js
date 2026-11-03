@@ -13,7 +13,7 @@ const http = require('http'), crypto = require('crypto'), fs = require('fs'), pa
 const PORT = +process.env.PORT || 8080;
 const CAP = +process.env.CAP || 88;            // per channel, hosts and guests included
 const GRACE = +process.env.GRACE_MS || 30000;   // a dropped connection keeps its name/seat this long
-const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 3;
+const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 6;   // one brew + 5 more
 const ROOT = __dirname;
 
 const A = ['살랑','소담','몽글','포근','고요한','느린','여린','은은한','잔잔한','다정한','따스한','아늑한'];
@@ -77,6 +77,7 @@ function onMessage(conn, m) {
       if (ti < 0 || ti >= NTABLES || k < 0 || k >= NSEAT) return;
       const holder = c.seats[ti][k];
       if (holder && holder !== p.uid) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'taken' });
+      if (k === 0 && !(p.tea && p.teaLeft > 0)) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'noTea' });   // 팽주석 needs a tea from the cabinet
       if (p.seat && (p.seat[0] !== ti || p.seat[1] !== k)) freeSeat(c, p);
       c.seats[ti][k] = p.uid; p.seat = [ti, k];
       if (k === 0) c.tables[ti].tea = p.tea;
