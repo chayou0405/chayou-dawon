@@ -423,7 +423,7 @@ function updateSound(t,dt){if(!SND.on||!SND.ac)return;const ac=SND.ac,N=SND.next
   N.chime=99;
   if(N.bowl===undefined)N.bowl=5;if(N.bowl<=0){singingBowl();N.bowl=60;}
   if(N.nut===undefined)N.nut=15;if(N.nut<=0){nutShaker();N.nut=40;}
-  if(N.frog<=0){if(night>.4){frog(.6+night*.5);if(Math.random()<.45)setTimeout(()=>{if(SND.on&&night>.4)frog(.5+night*.4);},250+Math.random()*700);}N.frog=.9+Math.random()*2.6;}
+  // (frog chorus at night removed)
   if(N.bird<=0){if(night<.5)bird(.8);N.bird=5+Math.random()*12;}}
 const moon=(()=>{const tex=canvasTex(256,256,(g,w,h)=>{g.clearRect(0,0,w,h);const r=g.createRadialGradient(118,112,10,128,128,100);r.addColorStop(0,'#fffdf2');r.addColorStop(.8,'#f1ead2');r.addColorStop(1,'#d9cfb0');
     g.fillStyle=r;g.beginPath();g.arc(128,128,100,0,Math.PI*2);g.fill();for(let i=0;i<14;i++){g.fillStyle=`rgba(150,140,115,${.08+rnd()*.12})`;g.beginPath();g.arc(70+rnd()*120,70+rnd()*120,6+rnd()*22,0,Math.PI*2);g.fill();}});
@@ -2138,7 +2138,7 @@ function updateHud(){
   else if(me.mode==='boat'){const moored=me.boat&&me.boat.state==='berth';status=ride.active?'대나무 뗏목 · 호수를 도는 중':(ride.waiting?'대나무 뗏목 · 같이 탈 사람을 기다리는 중':'대나무 뗏목');stand=moored?'나룻배 내리기':'중간에 내리기';busy=true;}
   else if(me.seat){const s=me.seat;{const hostHere=s.host||seatOf(s.table,0).occ;status=`${tableName(s.table.i)}${s.host?' · 팽주석':''} · ${hostHere?'오늘의 차 '+TEAS[s.table.teaType].full:'팽주를 기다리는 중'}`;}busy=true;stand='일어나기';
     if(!me.action){const T=s.table;if(s.host){snack=true;const hc=T.cups[0];act=(T.busy||T.serving>0||T.passing)?'':(T.ready?'차 따르기':(hc.state==='guest'&&hc.level>.1?'차 마시기':(me.tea?'차 우리기':'')));if(!me.tea&&!T.ready)status+=' · 찻장에서 새 차가 필요해요';}
-      else{const c=T.cups[s.k];if(c.state==='guest'&&c.level>.1)act='차 마시기';else if(c.state==='guest')act='찻잔 건네고 차 더 받기';else status+=' · 팽주가 차를 내는 중';snack=true;}}}
+      else{const c=T.cups[s.k];if(c.state==='guest'&&c.level>.1)act='차 마시기';else if(c.state==='guest')act='찻잔 건네고 차 더 받기';else if(seatOf(T,0).occ)status+=' · 팽주가 차를 내는 중';snack=true;}}}
   else{const w=placeNow();status=PLACE[w]||'다실';
     if(w==='dock'&&!ride.active)act='혼자 타기';if(nearCabinet())act='찻장 열기';}
   if(me.tea&&!me.brew)status+=` · ${TEAS[me.tea].name} ${me.teaLeft}회`;
@@ -2366,8 +2366,8 @@ const moodTexCache={};function moodTex(e){return moodTexCache[e]||(moodTexCache[
   g.font='60px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(e,64,62);const t=new THREE.CanvasTexture(c);return t;})());}
 const bubbles=[];
 function setFace(ch,kind){const f=ch.headPivot.userData.face;if(f){f.material.map=f.material.emissiveMap=faceTex(kind||ch.headPivot.userData.faceKind);f.material.needsUpdate=true;}}
-function showMood(ch,e){if(ch.bubble){scene.remove(ch.bubble.sp);setFace(ch);}const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:moodTex(e),transparent:true,depthTest:false}));sp.scale.set(.29,.29,1);sp.renderOrder=20;sp.layers.enableAll();scene.add(sp);ch.bubble={sp,t:0,sad:e==='☁️',face:e==='☁️'?'sad':e==='😊'?'smile':e==='😌'?'calm':null};if(ch.bubble.face)setFace(ch,ch.bubble.face);if(!bubbles.includes(ch))bubbles.push(ch);}
-function updateBubbles(dt){for(let i=bubbles.length-1;i>=0;i--){const ch=bubbles[i],b=ch.bubble;if(!b){bubbles.splice(i,1);continue;}b.t+=dt;ch.headPivot.updateMatrixWorld(true);ch.headPivot.getWorldPosition(b.sp.position);b.sp.position.y+=.72+Math.sin(b.t*3)*.02;
+function showMood(ch,e){if(ch.bubble){scene.remove(ch.bubble.sp);setFace(ch);}const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:moodTex(e),transparent:true,depthTest:false}));const bs=isTouch?.58:.29;sp.scale.set(bs,bs,1);sp.renderOrder=20;sp.layers.enableAll();scene.add(sp);ch.bubble={sp,t:0,sad:e==='☁️',face:e==='☁️'?'sad':e==='😊'?'smile':e==='😌'?'calm':null};if(ch.bubble.face)setFace(ch,ch.bubble.face);if(!bubbles.includes(ch))bubbles.push(ch);}
+function updateBubbles(dt){for(let i=bubbles.length-1;i>=0;i--){const ch=bubbles[i],b=ch.bubble;if(!b){bubbles.splice(i,1);continue;}b.t+=dt;ch.headPivot.updateMatrixWorld(true);if(ch.nameTag&&ch.nameTag.visible!==false){ch.nameTag.getWorldPosition(b.sp.position);b.sp.position.y+=.055+b.sp.scale.y*.5+.05+Math.sin(b.t*3)*.02;}else{ch.headPivot.getWorldPosition(b.sp.position);b.sp.position.y+=.72+Math.sin(b.t*3)*.02;}
   b.sp.material.opacity=b.t<.2?b.t/.2:b.t>3?Math.max(0,1-(b.t-3)/.5):1;if(!ch.action){ch.headPivot.rotation.x=b.sad?.26*Math.min(1,b.t/.6,Math.max(0,(3.5-b.t)/.5)):(b.t<1.4?.22*Math.max(0,Math.sin(b.t*Math.PI*2.2)):0);ch.headPivot.rotation.z=b.sad?.12*Math.min(1,b.t/.6,Math.max(0,(3.5-b.t)/.5)):0;}if(b.t>3.5){scene.remove(b.sp);if(b.face)setFace(ch);ch.bubble=null;bubbles.splice(i,1);}}}
 {const bar=$('moodBar');for(const[e,label]of MOODS){const bt=document.createElement('button');bt.type='button';bt.textContent=e;bt.setAttribute('aria-label',label);bt.title=label;
   bt.addEventListener('click',()=>{showMood(me,e);NET.mood(e);bar.hidden=true;canvas.focus();});bar.appendChild(bt);}}
@@ -2396,8 +2396,8 @@ $('goBtn').addEventListener('click',()=>{const w=placeNow();if(me.seat&&me.actio
   if(w==='dock'||w==='stones')walkTo(0,-HALF+3);else walkTo(0,(DOCK.z0+DOCK.z1)/2);setMode('follow');});
 
 /* ---------- camera & input ---------- */
-const cam={yaw:Math.PI,pitch:.1,dist:isTouch?6.4:5.6,mode:'follow'};
-const camPos=new V3(me.x,me.y+1.15+Math.sin(.1)*5.6,me.z-5.6),camLook=new V3(me.x,me.y+1.15+.9,me.z);
+const cam={yaw:Math.PI,pitch:.1,dist:isTouch?6.4*.8:5.6,mode:'follow'};
+const camPos=new V3(me.x,me.y+1.15+Math.sin(.1)*cam.dist,me.z-cam.dist),camLook=new V3(me.x,me.y+1.15+.9,me.z);
 function setMode(m){if(me.brew)return;cam.mode=m;}
 const keys=new Set();
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;const k=e.key.toLowerCase();
@@ -2584,9 +2584,9 @@ function frame(){
   {const f=cam.mode==='fp'?42:(isTouch?62:55);if(Math.abs(camera.fov-f)>.1){camera.fov+=(f-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();}}
   if(cam.mode==='fp'&&me.brew){fpView(tmpPos,tmpLook);}
   else if(cam.mode==='follow'){
-    const atTable=me.seat&&me.seat.table&&!me.brew,cx0=atTable?me.seat.table.cx:me.x,cz0=atTable?me.seat.table.cz:me.z;
+    const atTable=me.seat&&me.seat.table&&!me.brew,fz=isTouch?.4:0,cx0=atTable?lerp(me.seat.table.cx,me.seat.x,fz):me.x,cz0=atTable?lerp(me.seat.table.cz,me.seat.z,fz):me.z;   // phones: aim between the table centre and your own seat, where the tea set is
     const ty=atTable?.82:me.y+(me.seat||me.mode==='boat'?1.05:1.15);tmpLook.set(cx0,ty,cz0);
-    const cp=Math.cos(cam.pitch);let dist=atTable?Math.max(cam.dist,2.2):cam.dist;
+    const cp=Math.cos(cam.pitch);let dist=atTable?(isTouch?Math.max(cam.dist*.5,1.1):Math.max(cam.dist,2.2)):cam.dist;
     if(inRect(me.x,me.z,ROOM)){const sx=Math.sin(cam.yaw)*cp,sz=Math.cos(cam.yaw)*cp,lim=HALF-.45;
       if(sx>.01)dist=Math.min(dist,(lim-cx0)/sx);if(sx<-.01)dist=Math.min(dist,(-lim-cx0)/sx);if(sz>.01)dist=Math.min(dist,(lim-.4-cz0)/sz);
       dist=Math.min(dist,((atTable?3.4:3.3)-ty)/Math.max(.05,Math.sin(cam.pitch)));dist=Math.max(dist,1.2);}
