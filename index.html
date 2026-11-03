@@ -363,7 +363,13 @@ function initSound(){if(SND.ac)return true;const AC=window.AudioContext||window.
   {const s=loop(1.3),bp=ac.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1500;bp.Q.value=2.2;const bp2=ac.createBiquadFilter();bp2.type='peaking';bp2.frequency.value=900;bp2.gain.value=10;bp2.Q.value=4;
     const g=ac.createGain();g.gain.value=0;s.connect(bp).connect(bp2).connect(g).connect(master);s.start();SND.pour=g;SND.pourBP=bp;SND.pourBP2=bp2;}
   SND.next={chime:2+Math.random()*4,frog:3,cricket:1,bird:4};return true;}
-function setSound(on){if(on&&!initSound()){toast('이 브라우저에서는 소리를 낼 수 없어요');return;}SND.on=on;if(SND.ac){if(on)SND.ac.resume();SND.master.gain.setTargetAtTime(on?.75:0,SND.ac.currentTime,.4);}
+// iPhone/iPad: Web Audio stays silent while the ring/silent switch is on unless an <audio> element is playing, so a
+// looping silent clip runs alongside the sound; it is started from the same tap that turns the sound on.
+const SILENT=(()=>{const n=4000,b=new ArrayBuffer(44+n),v=new DataView(b),w=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i));};
+  w(0,'RIFF');v.setUint32(4,36+n,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,8000,true);v.setUint32(28,8000,true);v.setUint16(32,1,true);v.setUint16(34,8,true);w(36,'data');v.setUint32(40,n,true);
+  for(let i=0;i<n;i++)v.setUint8(44+i,128);const a=new Audio(URL.createObjectURL(new Blob([b],{type:'audio/wav'})));a.loop=true;a.setAttribute('playsinline','');a.preload='auto';return a;})();
+function setSound(on){if(on&&!initSound()){toast('이 브라우저에서는 소리를 낼 수 없어요');return;}SND.on=on;if(on){const pp=SILENT.play();if(pp&&pp.catch)pp.catch(()=>{});}else SILENT.pause();
+  if(SND.ac){if(on&&SND.ac.state!=='running')SND.ac.resume().catch(()=>{});SND.master.gain.setTargetAtTime(on?.75:0,SND.ac.currentTime,.4);}
   $('soundBtn').textContent=on?'소리 끄기':'소리 켜기';}
 function chime(vol){const ac=SND.ac,t=ac.currentTime,notes=[1046,1175,1318,1568,1760,2093];const n=1+Math.floor(Math.random()*3);
   for(let k=0;k<n;k++){const f=notes[Math.floor(Math.random()*notes.length)],t0=t+k*(.12+Math.random()*.25);
@@ -2349,7 +2355,12 @@ function goShoreThen(what){const p=shoreSpot();if(!p||me.mode!=='walk')return fa
 $('feedBtn').addEventListener('click',()=>{if(me.mode==='walk'&&placeNow()==='garden'&&goShoreThen('feed')){canvas.focus();return;}feedKoi();canvas.focus();});
 $('incenseBtn').addEventListener('click',()=>{const T=me.seat&&me.seat.table;if(T&&!me.action&&!T.incense&&!T.incensePending){T.incensePending=true;me.action={type:'incense',t:0,dur:2.5,T:me.seat.table};toast('향을 피웠어요. 잔잔한 연기가 피어올라요');lastHud='';}canvas.focus();});
 $('soundBtn').addEventListener('click',()=>{setSound(!SND.on);canvas.focus();});
-addEventListener('pointerdown',function first(e){if(e.target&&e.target.id==='soundBtn')return;removeEventListener('pointerdown',first);if(!SND.on)setSound(true);},{passive:true});
+// sound comes on with the first tap/click/key (mobile browsers only allow audio to start from touchend/click, not pointerdown);
+// it is also woken up again after the phone was locked or a call interrupted it
+{let userOff=false;$('soundBtn').addEventListener('click',()=>{userOff=!SND.on;});
+  const unlock=e=>{if(e&&e.target&&e.target.id==='soundBtn')return;if(!SND.on&&!userOff)setSound(true);else if(SND.on&&SND.ac&&SND.ac.state!=='running'){SND.ac.resume().catch(()=>{});const pp=SILENT.play();if(pp&&pp.catch)pp.catch(()=>{});}};
+  for(const ev of['touchend','click','keydown'])addEventListener(ev,unlock,{passive:true,capture:true});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&SND.on&&SND.ac&&SND.ac.state!=='running')SND.ac.resume().catch(()=>{});});}
 const MOODS=[['😊','흐뭇해요'],['🍃','차가 맛있어요'],['🙏','고마워요'],['😌','평온해요'],['☀️','행복해요'],['☁️','근심이 있어요']];
 const moodTexCache={};function moodTex(e){return moodTexCache[e]||(moodTexCache[e]=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');
   g.font='60px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(e,64,62);const t=new THREE.CanvasTexture(c);return t;})());}
