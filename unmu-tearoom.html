@@ -98,7 +98,9 @@ button:disabled{opacity:.5;cursor:default}
 #loading.done{opacity:0;pointer-events:none}
 @media (max-width:560px){
   .top{flex-wrap:nowrap;align-items:center}
-  .top .actions{flex-wrap:nowrap}
+  .top .actions{flex-wrap:nowrap;flex:none}
+  .top .actions button{white-space:nowrap;padding:7px 10px}
+  .top .brand{flex:1 1 auto;min-width:0}
   .desk-only{display:none!important}
   .brand{padding:8px 12px 9px}
   .brand h1 small{font-size:10.5px;letter-spacing:.12em}
@@ -2430,7 +2432,7 @@ $('goBtn').addEventListener('click',()=>{const w=placeNow();if(me.seat&&me.actio
   if(w==='dock'||w==='stones')walkTo(0,-HALF+3);else walkTo(0,(DOCK.z0+DOCK.z1)/2);setMode('follow');});
 
 /* ---------- camera & input ---------- */
-const cam={yaw:Math.PI,pitch:.1,dist:isTouch?6.4*.8:5.6,mode:'follow'};
+const cam={yaw:Math.PI,pitch:.1,dist:isTouch?6.6:5.6,mode:'follow'};
 const camPos=new V3(me.x,me.y+1.15+Math.sin(.1)*cam.dist,me.z-cam.dist),camLook=new V3(me.x,me.y+1.15+.9,me.z);
 function setMode(m){if(me.brew)return;cam.mode=m;}
 const keys=new Set();
@@ -2455,10 +2457,10 @@ canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);
   if(pointers.size===2){const[a,b]=[...pointers.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),dist:cam.dist};if(drag)drag.moved=true;}});
 canvas.addEventListener('pointermove',e=>{
   if(pointers.has(e.pointerId))pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pinch&&pointers.size===2){const[a,b]=[...pointers.values()];cam.dist=clamp(pinch.dist*pinch.d/Math.max(Math.hypot(a.x-b.x,a.y-b.y),1),2.4,16);return;}
+  if(pinch&&pointers.size===2){const[a,b]=[...pointers.values()];cam.dist=clamp(pinch.dist*pinch.d/Math.max(Math.hypot(a.x-b.x,a.y-b.y),1),isTouch?3.6:2.4,16);return;}
   if(drag&&pointers.size===1){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
     if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>6){drag.moved=true;canvas.classList.add('dragging');}
-    if(drag.moved){if(cam.mode!=='follow')setMode('follow');cam.yaw-=dx*.0058;cam.pitch=clamp(cam.pitch+dy*.004,-.12,1.2);}return;}
+    if(drag.moved){if(cam.mode!=='follow')setMode('follow');cam.yaw-=dx*(isTouch?.0042:.0058);cam.pitch=clamp(cam.pitch+dy*(isTouch?.003:.004),isTouch?.04:-.12,1.2);}return;}
   if(!isTouch&&me.mode==='walk'){pick(e);const h=ray.intersectObjects(hitMeshes)[0];canvas.classList.toggle('over-seat',!!h);
     if(h&&!me.seatTarget&&me.seat!==h.object.userData.seat){const s=h.object.userData.seat;ring.position.set(s.x,.015,s.z);ring.visible=true;}
     else if(!me.seatTarget)ring.visible=false;}});
@@ -2632,9 +2634,10 @@ function frame(){
       // aim a little below the lantern so it rides near the top edge of the frame with the lake and sky below it
       const vx=P.x-tmpPos.x,vy=P.y-tmpPos.y,vz=P.z-tmpPos.z,hz=Math.hypot(vx,vz)||1,el=Math.atan2(vy,hz),le=Math.max(-.1,el-.3);tmpLook.set(tmpPos.x+vx/hz*10*Math.cos(le),tmpPos.y+10*Math.sin(le),tmpPos.z+vz/hz*10*Math.cos(le));}}
     clipCamWalls(tmpLook,tmpPos);
+    if(!atTable){const d=tmpPos.distanceTo(tmpLook),minD=isTouch?3.2:2.2;if(d<minD)tmpPos.y+=(minD-d)*1.1;}
     const gy=Math.max(groundY(tmpPos.x,tmpPos.z),LAKE.y)+.5;if(tmpPos.y<gy)tmpPos.y=gy;
   }else{tmpPos.set(40,20,26);tmpLook.set(-2,-5,-40+LZ);}
-  const k=reduceMotion?1:1-Math.pow(.0015,dt);camPos.lerp(tmpPos,k);camLook.lerp(tmpLook,k);
+  const k=reduceMotion?1:1-Math.pow(isTouch?.012:.0015,dt);camPos.lerp(tmpPos,k);camLook.lerp(tmpLook,k);
   camera.position.copy(camPos);camera.lookAt(camLook);
   if(water)water.material.uniforms.time.value+=dt*.35;
   if(Math.abs(night-nightTarget)>.001){night+=(nightTarget-night)*Math.min(1,dt*1.5);if(Math.abs(night-nightTarget)<.002)night=nightTarget;applyNight(night);}
