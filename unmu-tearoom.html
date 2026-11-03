@@ -172,7 +172,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0000</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0010</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2490,7 +2490,7 @@ function walkTo(x,z){me.pending=null;if(me.mode==='boat')return;
 function doAct(){
   if(me.brew){brewNext();return;}
   if(me.seat&&!me.action){const s=me.seat,T=s.table;
-    if(s.host){if(T.busy||T.serving>0||T.passing)return;if(!T.ready&&T.cups[0].state==='guest'&&T.cups[0].level>.1){startDrink(me,T.cups[0]);return;}if(T.ready){if(!T.cups.some(c=>c&&c.k>0&&c.state==='host')){toast('앞에 놓인 찻잔이 없어요');return;}startServe(T);toast(`${TEAS[T.teaType].name}${eul(TEAS[T.teaType].name)} 손님들께 따라 드려요`);}else{if(!me.tea){standMe();walkTo(-1.1,CAB.z-1.6);toast('찻장으로 찻잎을 가지러 가요');lastHud='';return;}if(me.teaLeft>0&&me.brewedAt===T.i){pourAgain(T);return;}startBrew(T);}}
+    if(s.host){if(T.busy||T.serving>0||T.passing)return;if(!T.ready&&T.cups[0].state==='guest'&&T.cups[0].level>.1){startDrink(me,T.cups[0]);NET.drink();return;}if(T.ready){if(!T.cups.some(c=>c&&c.k>0&&c.state==='host')){toast('앞에 놓인 찻잔이 없어요');return;}startServe(T);toast(`${TEAS[T.teaType].name}${eul(TEAS[T.teaType].name)} 손님들께 따라 드려요`);}else{if(!me.tea){standMe();walkTo(-1.1,CAB.z-1.6);toast('찻장으로 찻잎을 가지러 가요');lastHud='';return;}if(me.teaLeft>0&&me.brewedAt===T.i){pourAgain(T);return;}startBrew(T);}}
     else{const cup=T.cups[s.k];if(cup.state!=='guest')return;
       if(cup.level>.1){startDrink(me,cup);NET.drink();}
       else{sendCup(cup,false);NET.cupback();toast(seatOf(T,0).occ?(T.teaType&&seatOf(T,0).occ&&T.pitcherLevel>0?'팽주에게 찻잔을 건넸어요 · 곧 다시 따라 드려요':'팽주에게 찻잔을 건넸어요'):'찻잔을 팽주 자리에 돌려놓았어요. 팽주석이 비어 있어요');}}
@@ -2559,7 +2559,8 @@ function replayAct(ch,kind,d){if(ch.action&&kind!=='toss')clearAction(ch);
   else if(kind==='lantern'&&typeof d.txt==='string'){const L=makeLantern(d.txt.slice(0,40),d.kind==='worry'?'worry':'wish');ch.action={type:'lantern',t:0,L};}}
 // pour a single cup for a guest who just sat down (the host has already brewed at this table)
 function serveOne(T,k,tea,tries=0){const c=T.cups[k];if(!c)return;readyCup(T,k);
-  if(T.serveAnim||T.passing||T.busy){if(tries<30)setTimeout(()=>serveOne(T,k,tea,tries+1),600);return;}
+  // the host is drinking (or busy with something else): finish that first, then pour from the fair cup
+  {const h=seatOf(T,0).occ;if(T.serveAnim||T.passing||T.busy||(h&&h.action&&h.action.type!=='tap')){if(tries<40)setTimeout(()=>serveOne(T,k,tea,tries+1),400);return;}}
   if(tea&&TEAS[tea]&&T.teaType!==tea)setTeaColor(T,tea);
   if(c.state!=='host'){c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}
   T.pitcherLevel=Math.max(T.pitcherLevel,.6);T.serveList=[c];T.serveAnim={i:0,t:0};T.serving=1;T.pitRest=T.pitRest||T.pitcher.position.clone();
@@ -2670,11 +2671,11 @@ function updateTable(T,dt){
   // NPC host: pours whenever a seated guest's cup is waiting in front of them
   const anyGuest=[1,2,3,4].some(k=>seatOf(T,k).occ);
   if(n.host&&!anyGuest&&!T.busy&&T.serving<=0&&!T.passing&&!n.host.action){n.timer-=dt;if(n.timer<=0){const c=T.cups[0];
-      if(c.level>.05){startDrink(n.host,c);n.timer=5+rnd()*5;}else{T.soloPour=true;startPour(n.host,T);n.timer=3+rnd()*3;}}}
+      if(c.level>.05){if(!T.serveAnim&&!T.passing)startDrink(n.host,c);n.timer=5+rnd()*5;}else{T.soloPour=true;startPour(n.host,T);n.timer=3+rnd()*3;}}}
   if(n.host&&anyGuest&&!T.busy&&T.serving<=0&&!T.passing&&!T.serveAnim){const waiting=T.cups.some(c=>c&&c.k>0&&c.state==='host'&&seatOf(T,c.k).occ&&seatOf(T,c.k).occ.isNpc);
     if(waiting){n.timer-=dt;if(n.timer<=0){T.npcPour=true;startPour(n.host,T);n.timer=1.5+rnd()*2;}}else n.timer=1.5+rnd()*2;}
   if(n.host&&!n.host.action&&!T.busy&&!T.serveAnim&&rnd()<dt*.03)startSnack(n.host);
-  if(n.host&&!n.host.action&&anyGuest){const hc=T.cups[0];n.sip=(n.sip||0)-dt;const sipping=n.guests.some(g=>g.ch.action&&g.ch.action.type==='drink');if(hc.state==='guest'&&hc.level>.05&&(sipping||n.sip<=-6)){startDrink(n.host,hc);n.sip=0;}}
+  if(n.host&&!n.host.action&&anyGuest){const hc=T.cups[0];n.sip=(n.sip||0)-dt;const sipping=n.guests.some(g=>g.ch.action&&g.ch.action.type==='drink');if(hc.state==='guest'&&hc.level>.05&&!T.serveAnim&&!T.passing&&!T.busy&&(sipping||n.sip<=-6)){startDrink(n.host,hc);n.sip=0;}}
   // NPC guests: drink when served, hand the cup back for more, nibble snacks
   for(const g of n.guests){if(g.ch.action)continue;const c=T.cups[g.k];g.delay-=dt;
     if(c.state==='guest'&&c.level>.05&&g.delay<=0){startDrink(g.ch,c);g.delay=4+rnd()*6;}
