@@ -63,6 +63,7 @@ function onMessage(conn, m) {
     case 'st': {   // position, facing, pose
       const s = m.s || {}; const num = v => (typeof v === 'number' && isFinite(v)) ? v : 0;
       p.st = { x: num(s.x), y: num(s.y), z: num(s.z), ry: num(s.ry), p: ['stand','sit','squat'].includes(s.p) ? s.p : 'stand', st: num(s.st) || .42, m: s.m ? 1 : 0, v: s.v === 0 ? 0 : 1 };
+      if (Array.isArray(s.b) && s.b.length === 3) p.st.b = s.b.map(num);   // raft pose while riding
       broadcast(c, { t: 'st', uid: p.uid, s: p.st }, conn.ws); break;
     }
     case 'tea': {  // picked a tea at the cabinet

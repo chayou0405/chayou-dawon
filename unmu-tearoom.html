@@ -1180,7 +1180,7 @@ const cupTeaGeo=new THREE.CylinderGeometry(1,.55,1,20);cupTeaGeo.translate(0,.5,
 const CUP_Y0=.0095,CUP_H=.033;const cupR=y=>lerp(.022,.043,clamp((y-CUP_Y0)/CUP_H,0,1));
 const tables=[],seats=[],hitMeshes=[];
 const TABLE_LAYOUT=[[-5.6,-6.2,.18+Math.PI],[5.6,-5.9,-.2],[-6.9,.8,-.22],[.3,-2.0,.08+Math.PI],[6.8,1.2,-.15+Math.PI],[-5.4,7.0,.12],[.4,4.2,-.2+Math.PI],[6.2,7.2,.3]];
-const TABLE_FLIP=TABLE_LAYOUT.map(()=>Math.random()<.5);
+const TABLE_FLIP=[false,true,false,true,true,false,true,false];   // fixed so seats are in the same place on every PC and phone
 function inTable(T,x,z,m){const dx=x-T.cx,dz=z-T.cz,c=Math.cos(T.rot),s=Math.sin(T.rot),lx=dx*c-dz*s,lz=dx*s+dz*c;return Math.abs(lx)<TB+m&&Math.abs(lz)<TB+m;}
 const tableName=i=>['일','이','삼','사','오','육','칠','팔','구'][i]+'번 찻자리';
 function makeCup(){const g=new THREE.Group();add(cupGeo,MAT.porcelainDS,0,0,0,g);const l=add(cupTeaGeo,MAT.liquor,0,CUP_Y0,0,g);return{g,liquid:l,level:0,state:'host'};}
@@ -2080,13 +2080,14 @@ const NET=(()=>{
   const setStatus=s=>{status=s;info();};
   function shareUrl(){const u=new URL(location.href);u.searchParams.set('server',ch);if(q.get('ws'))u.searchParams.set('ws',q.get('ws'));return u.toString();}
   function out(m){if(ws&&ws.readyState===1)ws.send(JSON.stringify(m));}
-  function myState(){const top=me.seat?me.seat.top:.42;return{x:+me.x.toFixed(2),y:+me.y.toFixed(2),z:+me.z.toFixed(2),ry:+me.ry.toFixed(2),p:me.pose||'stand',st:+top.toFixed(2),m:moving?1:0,v:me.root.visible?1:0};}
+  function myState(){const top=me.seat?me.seat.top:.42,o={x:+me.x.toFixed(2),y:+me.y.toFixed(2),z:+me.z.toFixed(2),ry:+me.ry.toFixed(2),p:me.pose||'stand',st:+top.toFixed(2),m:moving?1:0,v:me.root.visible?1:0};
+    if(me.mode==='boat'&&me.boat){const g=me.boat.r.g;o.b=[+g.position.x.toFixed(2),+g.position.z.toFixed(2),+g.rotation.y.toFixed(3)];}return o;}
   function avatar(P){if(P.c)return P.c;const c=makeChar(P.look&&P.look.robe?P.look:NPC_LOOKS[0]);c.isRemote=true;scene.add(c.root);P.c=c;P.pose='stand';P.seen=false;setNameTag(c,P.nick);
     if(P.st)applySt(P,P.st,true);else c.root.visible=false;return c;}
-  function applySt(P,s,snap){P.tx=s.x;P.ty=s.y;P.tz=s.z;P.try=s.ry;P.m=s.m;const c=P.c;if(!c)return;c.root.visible=!!s.v&&P.online!==false;
+  function applySt(P,s,snap){P.tx=s.x;P.ty=s.y;P.tz=s.z;P.try=s.ry;P.m=s.m;P.b=Array.isArray(s.b)?s.b:null;const c=P.c;if(!c)return;c.root.visible=!!s.v&&P.online!==false;
     if(snap||!P.seen){P.seen=true;c.x=s.x;c.y=s.y;c.z=s.z;c.ry=s.ry;c.root.position.set(c.x,c.y,c.z);}
     if(s.p!==P.pose){P.pose=s.p;setPose(c,s.p==='squat'?'squat':s.p==='sit'?'sit':'stand',s.st);}}
-  function drop(P){if(P.c){scene.remove(P.c.root);if(P.c.bubble){scene.remove(P.c.bubble.sp);P.c.bubble=null;}}
+  function drop(P){if(P.raft)P.raft.g.visible=false;if(P.c){scene.remove(P.c.root);if(P.c.bubble){scene.remove(P.c.bubble.sp);P.c.bubble=null;}}
     for(const s of seats)if(s.occ&&s.occ===P.c)s.occ=null;members.delete(P.uid);}
   function seatAt(ti,k){const T=tables[ti];return T&&seatOf(T,k);}
   function applySeat(ti,k,who){const s=seatAt(ti,k);if(!s)return;
@@ -2142,7 +2143,14 @@ const NET=(()=>{
     start(){if(started)return;started=true;info();connect();},
     get online(){return status==='connected';},get uid(){return uid;},get nick(){return nick;},
     update(dt,mv){moving=mv;for(const P of members.values()){const c=P.c;if(!c||!P.seen)continue;const k=Math.min(1,dt*8);c.x+=(P.tx-c.x)*k;c.y+=(P.ty-c.y)*k;c.z+=(P.tz-c.z)*k;c.ry=lerpAngle(c.ry,P.try,k);
-        c.root.updateMatrixWorld(true);updateChar(c,dt,!!P.m&&P.pose==='stand');}
+        c.root.updateMatrixWorld(true);updateChar(c,dt,!!P.m&&P.pose==='stand');
+        // a player on a raft sits on the same raft seat on every screen: their raft is drawn under them, unless one of
+        // this screen's moored rafts is already in exactly that spot
+        if(P.b&&P.online!==false){if(!P.raft){P.raft=makeRaft(0,true);P.raft.g.position.set(P.b[0],LAKE.y-.08,P.b[1]);P.raft.g.rotation.y=P.b[2];}const g=P.raft.g;
+          g.position.x+=(P.b[0]-g.position.x)*k;g.position.z+=(P.b[1]-g.position.z)*k;g.rotation.y=lerpAngle(g.rotation.y,P.b[2],k);g.position.y=LAKE.y-.08+Math.sin(performance.now()/770)*.03;
+          g.visible=!POOL.some(Q=>Q.state==='berth'&&Q.r.g.visible&&Math.hypot(Q.r.g.position.x-g.position.x,Q.r.g.position.z-g.position.z)<1.2);
+          P.raft.man.root.updateMatrixWorld(true);updateAction(P.raft.man,dt);}
+        else if(P.raft)P.raft.g.visible=false;}
       if(status!=='connected')return;sendT-=dt;const st=myState(),key=JSON.stringify(st);if(sendT<=0&&(key!==last||sendT<-1.5)){out({t:'st',s:st});last=key;sendT=.1;}},
     mood(e){out({t:'mood',e});},
     others(){return[...members.values()].filter(P=>P.online&&P.c&&P.seen).map(P=>({x:P.tx,z:P.tz,nick:P.nick}));},
