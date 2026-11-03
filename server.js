@@ -1,0 +1,206 @@
+// 차요우 다원 실시간 서버 — Node 18+ only, no npm dependencies.
+// Serves the game files (index.html, tex/) and a WebSocket endpoint at /ws on the same port.
+//
+//   node server.js            → http://localhost:8080  (game)   ws://localhost:8080/ws  (realtime)
+//   PORT=10000 node server.js → for hosts that assign a port (Render, Railway, Fly …)
+//
+// The server is the single source of truth for: who is on which server ("channel"), the 88-person cap,
+// nicknames (unique per channel), session resume after a reload, seat occupancy, the host (팽주) role,
+// each player's chosen tea and remaining infusions, every guest cup, and table events (serve, drink, 함께 한 모금).
+'use strict';
+const http = require('http'), crypto = require('crypto'), fs = require('fs'), path = require('path');
+
+const PORT = +process.env.PORT || 8080;
+const CAP = +process.env.CAP || 88;            // per channel, hosts and guests included
+const GRACE = +process.env.GRACE_MS || 30000;   // a dropped connection keeps its name/seat this long
+const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 3;
+const ROOT = __dirname;
+
+const A = ['살랑','소담','몽글','포근','고요한','느린','여린','은은한','잔잔한','다정한','따스한','아늑한'];
+const B = ['구름','이슬','바람','달빛','잎새','여울','윤슬','꽃잎','노을','안개','햇살','물결'];
+const NICKS = A.flatMap(a => B.map(b => a + b));   // 144
+
+const channels = new Map();
+function channel(id) {
+  let c = channels.get(id);
+  if (!c) {
+    c = { id, players: new Map(), bySid: new Map(),
+      seats: Array.from({ length: NTABLES }, () => Array(NSEAT).fill(null)),
+      tables: Array.from({ length: NTABLES }, () => ({ tea: null, ready: false, cups: Array(NSEAT).fill(0) })) };
+    channels.set(id, c);
+  }
+  return c;
+}
+const occupancy = c => c.players.size;   // online players + players inside their reconnect grace window
+const pub = p => ({ uid: p.uid, nick: p.nick, look: p.look, st: p.st, online: p.online, seat: p.seat, tea: p.tea, teaLeft: p.teaLeft });
+const tableState = (c, ti) => ({ ti, tea: c.tables[ti].tea, ready: c.tables[ti].ready, cups: c.tables[ti].cups, seats: c.seats[ti] });
+
+function send(ws, m) { if (ws && ws.readyState === 1) wsSend(ws, JSON.stringify(m)); }
+function broadcast(c, m, except) { const s = JSON.stringify(m); for (const p of c.players.values()) if (p.online && p.ws !== except) wsSend(p.ws, s); }
+
+function freeSeat(c, p) {
+  if (!p.seat) return;
+  const [ti, k] = p.seat;
+  if (c.seats[ti][k] === p.uid) {
+    c.seats[ti][k] = null;
+    if (k > 0) c.tables[ti].cups[k] = 0;
+    if (k === 0) c.tables[ti].ready = false;
+    broadcast(c, { t: 'seat', ti, k, uid: null });
+  }
+  p.seat = null;
+}
+function removePlayer(c, p) {
+  freeSeat(c, p); c.players.delete(p.uid); c.bySid.delete(p.sid);
+  broadcast(c, { t: 'leave', uid: p.uid });
+  if (!c.players.size) channels.delete(c.id);
+}
+
+function onMessage(conn, m) {
+  if (!m || typeof m.t !== 'string') return;
+  if (m.t === 'hello') return hello(conn, m);
+  const c = conn.c, p = conn.p; if (!c || !p) return;
+  switch (m.t) {
+    case 'st': {   // position, facing, pose
+      const s = m.s || {}; const num = v => (typeof v === 'number' && isFinite(v)) ? v : 0;
+      p.st = { x: num(s.x), y: num(s.y), z: num(s.z), ry: num(s.ry), p: ['stand','sit','squat'].includes(s.p) ? s.p : 'stand', st: num(s.st) || .42, m: s.m ? 1 : 0, v: s.v === 0 ? 0 : 1 };
+      broadcast(c, { t: 'st', uid: p.uid, s: p.st }, conn.ws); break;
+    }
+    case 'tea': {  // picked a tea at the cabinet
+      if (p.tea && p.teaLeft > 0) return send(conn.ws, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft });
+      if (typeof m.key !== 'string' || m.key.length > 24) return;
+      p.tea = m.key; p.teaLeft = INFUSIONS;
+      broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft }); break;
+    }
+    case 'sit': {
+      const ti = m.ti | 0, k = m.k | 0;
+      if (ti < 0 || ti >= NTABLES || k < 0 || k >= NSEAT) return;
+      const holder = c.seats[ti][k];
+      if (holder && holder !== p.uid) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'taken' });
+      if (k === 0 && !(p.tea && p.teaLeft > 0)) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'noTea' });
+      if (p.seat && (p.seat[0] !== ti || p.seat[1] !== k)) freeSeat(c, p);
+      c.seats[ti][k] = p.uid; p.seat = [ti, k];
+      if (k === 0) c.tables[ti].tea = p.tea;
+      broadcast(c, { t: 'seat', ti, k, uid: p.uid });
+      broadcast(c, { t: 'table', ...tableState(c, ti) }); break;
+    }
+    case 'stand': freeSeat(c, p); break;
+    case 'brewed': {   // host finished an infusion in the fair cup
+      if (!p.seat || p.seat[1] !== 0 || !(p.teaLeft > 0)) return;
+      const ti = p.seat[0], T = c.tables[ti];
+      T.tea = p.tea; T.ready = true; p.teaLeft -= 1; const tea = p.tea; if (p.teaLeft <= 0) p.tea = null;
+      broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft });
+      // pouring follows immediately: every seated guest gets a full cup
+      const ks = []; for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) { T.cups[k] = 1; ks.push(k); }
+      T.ready = false;
+      broadcast(c, { t: 'serve', ti, tea, ks, by: p.uid });
+      broadcast(c, { t: 'table', ...tableState(c, ti) }); break;
+    }
+    case 'drink': {
+      if (!p.seat) return; const [ti, k] = p.seat; c.tables[ti].cups[k] = 0;
+      broadcast(c, { t: 'drink', ti, k, uid: p.uid }, conn.ws); break;
+    }
+    case 'cupback': {
+      if (!p.seat || p.seat[1] === 0) return; const [ti, k] = p.seat; c.tables[ti].cups[k] = 0;
+      broadcast(c, { t: 'cupback', ti, k, uid: p.uid }, conn.ws); break;
+    }
+    case 'cheers': {   // 함께 한 모금: everyone at that table drinks together
+      if (!p.seat) return; const ti = p.seat[0];
+      for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) c.tables[ti].cups[k] = 0;
+      broadcast(c, { t: 'cheers', ti, by: p.uid }); break;
+    }
+    case 'mood': if (typeof m.e === 'string' && m.e.length <= 8) broadcast(c, { t: 'mood', uid: p.uid, e: m.e }, conn.ws); break;
+    case 'ping': send(conn.ws, { t: 'pong' }); break;
+  }
+}
+
+function hello(conn, m) {
+  if (conn.p) return;
+  const id = String(m.ch || '1').replace(/[^0-9a-z-]/gi, '').slice(0, 16) || '1';
+  if (!channels.has(id) && channels.size >= MAX_CHANNELS) return send(conn.ws, { t: 'error', why: 'tooManyServers' });
+  const c = channel(id);
+  // same browser session coming back (reload / short drop): same id, same name, same seat
+  const back = typeof m.sid === 'string' && c.bySid.get(m.sid);
+  let p = back && c.players.get(back);
+  if (p) {
+    clearTimeout(p.graceTimer); if (p.online && p.ws !== conn.ws) { try { p.ws.close(); } catch (e) {} }
+    p.ws = conn.ws; p.online = true; if (m.look && typeof m.look === 'object') p.look = m.look;
+    conn.c = c; conn.p = p;
+    send(conn.ws, { t: 'welcome', resumed: true, uid: p.uid, sid: p.sid, nick: p.nick, ch: id, cap: CAP, me: pub(p), players: [...c.players.values()].filter(q => q !== p).map(pub), tables: c.tables.map((_, ti) => tableState(c, ti)) });
+    broadcast(c, { t: 'back', p: pub(p) }, conn.ws);
+    return;
+  }
+  if (occupancy(c) >= CAP) {
+    let alt = null; for (let n = 1; n <= MAX_CHANNELS; n++) { const cc = channels.get(String(n)); if (!cc || occupancy(cc) < CAP) { alt = String(n); break; } }
+    if (!c.players.size) channels.delete(id);
+    return send(conn.ws, { t: 'full', ch: id, count: occupancy(c), cap: CAP, alt });
+  }
+  const used = new Set([...c.players.values()].map(q => q.nick));
+  const free = NICKS.filter(n => !used.has(n));
+  const nick = free[crypto.randomInt(free.length)];
+  p = { uid: crypto.randomUUID(), sid: crypto.randomBytes(18).toString('base64url'), nick, look: (m.look && typeof m.look === 'object') ? m.look : {}, st: null,
+    ws: conn.ws, online: true, graceTimer: null, seat: null, tea: null, teaLeft: 0 };
+  c.players.set(p.uid, p); c.bySid.set(p.sid, p.uid); conn.c = c; conn.p = p;
+  send(conn.ws, { t: 'welcome', resumed: false, uid: p.uid, sid: p.sid, nick, ch: id, cap: CAP, me: pub(p), players: [...c.players.values()].filter(q => q !== p).map(pub), tables: c.tables.map((_, ti) => tableState(c, ti)) });
+  broadcast(c, { t: 'enter', p: pub(p) }, conn.ws);
+}
+
+function onClose(conn) {
+  const c = conn.c, p = conn.p; if (!c || !p || p.ws !== conn.ws) return;
+  p.online = false; broadcast(c, { t: 'away', uid: p.uid });
+  p.graceTimer = setTimeout(() => removePlayer(c, p), GRACE);   // name and seat stay reserved during the grace window
+}
+
+/* ---------- static files ---------- */
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.jpg': 'image/jpeg', '.png': 'image/png', '.json': 'application/json', '.css': 'text/css' };
+const server = http.createServer((req, res) => {
+  const u = new URL(req.url, 'http://x');
+  if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }); return res.end(JSON.stringify({ ok: true, channels: [...channels.values()].map(c => ({ id: c.id, count: occupancy(c) })) })); }
+  let f = decodeURIComponent(u.pathname); if (f.endsWith('/')) f += 'index.html';
+  const file = path.join(ROOT, path.normalize(f).replace(/^(\.\.[/\\])+/, ''));
+  if (!file.startsWith(ROOT) || !/\.(html|jpg|png|js|css|json)$/.test(file) || /server\.js$/.test(file)) { res.writeHead(404); return res.end('not found'); }
+  fs.readFile(file, (err, data) => { if (err) { res.writeHead(404); return res.end('not found'); } res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }); res.end(data); });
+});
+
+/* ---------- minimal WebSocket (RFC 6455), text frames only ---------- */
+server.on('upgrade', (req, sock) => {
+  if (new URL(req.url, 'http://x').pathname !== '/ws' || (req.headers.upgrade || '').toLowerCase() !== 'websocket') return sock.destroy();
+  const key = req.headers['sec-websocket-key']; if (!key) return sock.destroy();
+  const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+  sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
+  sock.setNoDelay(true);
+  const ws = { sock, readyState: 1, close() { if (this.readyState !== 1) return; this.readyState = 3; try { sock.write(Buffer.from([0x88, 0])); sock.end(); } catch (e) {} } };
+  const conn = { ws, c: null, p: null, alive: true };
+  let buf = Buffer.alloc(0);
+  sock.on('data', d => {
+    buf = Buffer.concat([buf, d]);
+    for (;;) {
+      if (buf.length < 2) return;
+      const op = buf[0] & 15, masked = buf[1] & 128; let len = buf[1] & 127, o = 2;
+      if (len === 126) { if (buf.length < 4) return; len = buf.readUInt16BE(2); o = 4; }
+      else if (len === 127) { if (buf.length < 10) return; len = Number(buf.readBigUInt64BE(2)); o = 10; }
+      if (len > 65536) return ws.close();
+      const need = o + (masked ? 4 : 0) + len; if (buf.length < need) return;
+      let payload = buf.subarray(o + (masked ? 4 : 0), need);
+      if (masked) { const mk = buf.subarray(o, o + 4); payload = Buffer.from(payload); for (let i = 0; i < payload.length; i++) payload[i] ^= mk[i & 3]; }
+      buf = buf.subarray(need);
+      conn.alive = true;
+      if (op === 1) { let m = null; try { m = JSON.parse(payload.toString('utf8')); } catch (e) {} onMessage(conn, m); }
+      else if (op === 8) { ws.close(); }
+      else if (op === 9) { wsRaw(ws, 0x8A, payload); }
+    }
+  });
+  const end = () => { if (ws.readyState === 3 && conn.ended) return; ws.readyState = 3; if (!conn.ended) { conn.ended = true; onClose(conn); } };
+  sock.on('close', end); sock.on('error', end);
+  conns.add(conn); sock.on('close', () => conns.delete(conn));
+});
+function wsRaw(ws, op, payload) {
+  const n = payload.length; let h;
+  if (n < 126) h = Buffer.from([op, n]); else if (n < 65536) { h = Buffer.alloc(4); h[0] = op; h[1] = 126; h.writeUInt16BE(n, 2); } else { h = Buffer.alloc(10); h[0] = op; h[1] = 127; h.writeBigUInt64BE(BigInt(n), 2); }
+  try { ws.sock.write(Buffer.concat([h, payload])); } catch (e) {}
+}
+function wsSend(ws, s) { if (ws.readyState === 1) wsRaw(ws, 0x81, Buffer.from(s, 'utf8')); }
+// drop connections that went silent (phone locked, network gone) so their grace timer starts
+const conns = new Set();
+setInterval(() => { for (const c of conns) { if (!c.alive) { try { c.ws.sock.destroy(); } catch (e) {} continue; } c.alive = false; wsRaw(c.ws, 0x89, Buffer.alloc(0)); } }, 20000);
+
+server.listen(PORT, () => console.log(`차요우 다원 서버: http://localhost:${PORT}  (실시간: ws://localhost:${PORT}/ws, 서버당 ${CAP}명)`));

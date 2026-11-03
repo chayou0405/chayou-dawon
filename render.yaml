@@ -1,0 +1,12 @@
+# Render.com Blueprint: one free web service that serves the game and the realtime WebSocket (/ws)
+services:
+  - type: web
+    name: chayou-dawon
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: CAP
+        value: "88"

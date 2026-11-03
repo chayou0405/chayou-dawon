@@ -2,6 +2,7 @@
 <html lang="ko">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="chayou-server" content="">
 <title>차요우 다원</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,10 +33,14 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 .bottom{align-items:flex-end}
 .brand{pointer-events:auto;background:var(--glass);border:1px solid var(--line);border-radius:4px;padding:10px 14px 11px;
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-width:0}
-.brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.06em;line-height:1.15;display:flex;align-items:baseline;gap:8px}
+.brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.06em;line-height:1.15;display:flex;align-items:baseline;gap:8px}
 .brand h1 small{font-size:13px;font-weight:400;color:var(--muted);letter-spacing:.2em}
 .brand p{margin:4px 0 0;font-size:12px;color:var(--muted);letter-spacing:.02em}
 .brand p{display:none}
+#netInfo{display:inline-flex;align-items:center;gap:5px;font-family:var(--f-body);font-weight:500;font-size:11.5px;letter-spacing:.02em;color:var(--ink);white-space:nowrap}
+.brand h1{flex-wrap:wrap;row-gap:2px}
+#netInfo:before{content:'';width:7px;height:7px;border-radius:50%;background:#888;flex:none}
+#netInfo[data-state=connected]:before{background:var(--jade)}#netInfo[data-state=connecting]:before,#netInfo[data-state=reconnecting]:before{background:#e0a24f}#netInfo[data-state=failed]:before,#netInfo[data-state=full]:before{background:#d0584a}
 .actions{display:flex;gap:8px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end}
 button{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--glass);border:1px solid var(--line);border-radius:4px;
   padding:9px 14px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-height:40px}
@@ -66,6 +71,9 @@ button:disabled{opacity:.5;cursor:default}
 #lanternText{font-family:var(--f-display);font-size:18px;line-height:1.7;color:#2a180c;background:transparent;border:1px dashed rgba(90,60,30,.4);border-radius:2px;padding:10px 12px;resize:none;min-height:110px}
 #lanternText:focus{outline:2px solid rgba(168,50,42,.5);outline-offset:1px}
 .lrow{display:flex;gap:8px;justify-content:flex-end}
+#fullPanel{position:fixed;inset:0;display:grid;place-items:center;background:rgba(14,10,8,.6);padding:16px;z-index:7}
+#fullPanel .sheet{background:#231a15;border:1px solid var(--line);border-radius:6px;padding:20px;max-width:340px;width:100%;display:flex;flex-direction:column;gap:12px;text-align:center}
+#fullPanel h2{margin:0;font-family:var(--f-display);font-size:20px}#fullPanel p{margin:0;color:var(--muted);font-size:13px}#fullPanel .gpick{display:flex}#fullPanel .gpick button{flex:1;min-height:44px}
 #genderPanel{position:fixed;inset:0;display:grid;place-items:center;background:rgba(14,10,8,.5);padding:16px;z-index:6}
 #genderPanel .sheet{background:#231a15;border:1px solid var(--line);border-radius:6px;padding:20px;max-width:340px;width:100%;display:flex;flex-direction:column;gap:12px;text-align:center}
 #genderPanel h2{margin:0;font-family:var(--f-display);font-size:20px;letter-spacing:.06em}
@@ -98,9 +106,9 @@ button:disabled{opacity:.5;cursor:default}
   .top .actions{flex-wrap:nowrap}
   .desk-only{display:none!important}
   .brand{padding:8px 12px 9px}
-  .brand h1 small{display:none}
+  .brand h1 small{font-size:10.5px;letter-spacing:.12em}
   #toast{font-size:12px;padding:6px 12px;top:max(70px,calc(env(safe-area-inset-top,0px) + 64px))}
-  .brand h1{font-size:19px}
+  .brand h1{font-size:15px}
   .brand p{font-size:11px}
   button{padding:8px 11px;font-size:12.5px}
 }
@@ -111,9 +119,7 @@ button:disabled{opacity:.5;cursor:default}
 <div id="ui">
   <div class="top">
     <div class="brand">
-      <h1>차요우 다원 <small>茶友茶园</small></h1>
-      <p>찻자리 8곳 · 팽주 1 + 손님 4 · 호숫가 나루터</p>
-      <p id="netInfo" aria-live="polite">채널에 연결하는 중…</p>
+      <h1>차요우 다원 <small>茶友茶园</small><span id="netInfo" aria-live="polite">접속 중…</span></h1>
     </div>
     <div class="actions">
       <button id="goBtn" type="button" class="desk-only">나루터로 가기</button>
@@ -155,6 +161,8 @@ button:disabled{opacity:.5;cursor:default}
   <div class="lkind" role="radiogroup" aria-label="무엇을 적을까요"><button type="button" data-k="wish" class="on" role="radio" aria-checked="true">소원</button><button type="button" data-k="worry" role="radio" aria-checked="false">근심</button></div>
   <textarea id="lanternText" maxlength="40" rows="4" placeholder="여기에 적어 주세요 (40자까지)"></textarea>
   <div class="lrow"><button id="lanternClose" type="button">닫기</button><button id="lanternGo" class="primary" type="button" disabled>풍등 날리기</button></div></div></div>
+<div id="fullPanel" hidden><div class="sheet" role="alertdialog" aria-labelledby="fullTitle">
+  <h2 id="fullTitle">만원이에요</h2><p id="fullText"></p><div class="gpick"><button type="button" id="fullGo" hidden></button></div></div></div>
 <div id="genderPanel" hidden><div class="sheet" role="dialog" aria-labelledby="genderTitle">
   <h2 id="genderTitle">차요우 다원에 들어가요</h2><p>어떤 모습으로 들어갈까요?</p>
   <div class="gpick"><button type="button" data-g="f">여성</button><button type="button" data-g="m">남성</button></div></div></div>
@@ -377,6 +385,10 @@ const SILENT=(()=>{const n=4000,b=new ArrayBuffer(44+n),v=new DataView(b),w=(o,t
 function setSound(on){if(on&&!initSound()){toast('이 브라우저에서는 소리를 낼 수 없어요');return;}SND.on=on;if(on){const pp=SILENT.play();if(pp&&pp.catch)pp.catch(()=>{});}else SILENT.pause();
   if(SND.ac){if(on&&SND.ac.state!=='running')SND.ac.resume().catch(()=>{});SND.master.gain.setTargetAtTime(on?.75:0,SND.ac.currentTime,.4);}
   $('soundBtn').textContent=on?'소리 끄기':'소리 켜기';}
+// a soft knuckle knock on the wooden table (탁자 톡톡), quieter the farther it is from the camera
+function knock(pos){if(!SND.on||!SND.ac)return;const ac=SND.ac,t=ac.currentTime,d=pos&&typeof camera!=='undefined'?camera.position.distanceTo(pos):3,vol=Math.max(0,1-d/14)*.5;if(vol<.02)return;
+  const o=ac.createOscillator();o.type='sine';o.frequency.setValueAtTime(240,t);o.frequency.exponentialRampToValueAtTime(130,t+.08);const g=ac.createGain();g.gain.setValueAtTime(vol*.6,t);g.gain.exponentialRampToValueAtTime(.0001,t+.12);o.connect(g).connect(SND.master);o.start(t);o.stop(t+.14);
+  const n=ac.createBufferSource();n.buffer=SND.noise;const bp=ac.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1100;bp.Q.value=3;const g2=ac.createGain();g2.gain.setValueAtTime(vol*.5,t);g2.gain.exponentialRampToValueAtTime(.0001,t+.05);n.connect(bp).connect(g2).connect(SND.master);n.start(t);n.stop(t+.06);}
 function chime(vol){const ac=SND.ac,t=ac.currentTime,notes=[1046,1175,1318,1568,1760,2093];const n=1+Math.floor(Math.random()*3);
   for(let k=0;k<n;k++){const f=notes[Math.floor(Math.random()*notes.length)],t0=t+k*(.12+Math.random()*.25);
     for(const[m,a]of[[1,1],[2.76,.4],[5.4,.18]]){const o=ac.createOscillator();o.type='sine';o.frequency.value=f*m;const g=ac.createGain();g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol*a*.08,t0+.005);g.gain.exponentialRampToValueAtTime(.0001,t0+2.6/m+.6);o.connect(g).connect(SND.master);o.start(t0);o.stop(t0+3.5);}}}
@@ -1713,6 +1725,7 @@ function updateAction(ch,dt){
   }else if(a.type==='tap'){
     const T=a.T,f=fwd(ch),spot=tableWorld(T,a.cup.rest,new V3()).addScaledVector(f,-.12).add(new V3(0,.018,0)).addScaledVector(new V3(-f.z,0,f.x),-.06);
     const reach=seg(t,0,.5),back=seg(t,1.7,2.2),tap=(t>.55&&t<1.65)?Math.abs(Math.sin((t-.55)*Math.PI*2.7))*.035:0;
+    for(const kt of[.92,1.29,1.66]){if(t>=kt&&!(a.knocks>kt)){a.knocks=kt;knock(spot);}}
     const handT=lapR.clone().lerp(spot.clone().add(new V3(0,tap,0)),reach*(1-back));ik(R,handT,poleW(ch,-1,_p1));ik(L,lapL,poleW(ch,1,_p2));
     ch.headPivot.rotation.x=.1*reach*(1-back);
     if(t>=a.dur){ch.action=null;ch.headPivot.rotation.x=0;}
@@ -2032,24 +2045,13 @@ function planRoute(tx,tz,allow=null){
 const PLACE={room:'다실',veranda:'다실 툇마루',stairs:'다실 계단',garden:'월동문 정원',stones:'징검다리',dock:'나루터'};
 function placeNow(){const s=surfaceAt(me.x,me.z);return s?s.where:'room';}
 $('hint').hidden=isTouch;$('hint').innerHTML=isTouch?'':'<kbd>W A S D</kbd> 이동 · 의자 클릭해 앉기 · <kbd>E</kbd> 앉기/일어나기 · <kbd>F</kbd> 차 우리기·마시기 · 드래그로 둘러보기';
-/* ---------- multiplayer & nicknames (WebRTC between browsers via Trystero; there is NO game server) ----------
-   What this does:
-   - Each browser tab session gets a private unique id (uid, kept in sessionStorage).  Avatars, presence and the
-     nickname reservation are keyed by that uid, never by the nickname or the WebRTC peer id.
-   - Nicknames are 앞말+뒷말 (12x12 = 144, no space, no digits).  On entry a browser first listens to the channel
-     ("server") for a few seconds, learns which names are taken or reserved, then claims a free one at random and
-     announces it.  If two browsers claimed the same name at the same moment, the later claim (ties: smaller uid wins)
-     quietly picks another free name.  This is peer-to-peer agreement, not a server-side lock: the room has no
-     authority, so a short-lived duplicate is possible under a burst of simultaneous joins until it self-corrects.
-   - Reload / brief disconnect: the session (uid, nickname, channel, claim time) is restored from sessionStorage if
-     it is less than GRACE old, and the other browsers keep that name reserved for GRACE after a peer drops.  A new
-     tab or an older session is a new entrant with a new name.
-   - A channel holds 88 (members + reserved slots).  A full channel is not entered: the browser shows that it is full
-     and tries the next channel.  Names only have to be unique inside one channel.
-   Shared over the network: avatars, positions, poses and mood bubbles.  Tea tables, seats, host/guest roles, cups,
-   NPCs and rafts run locally in each browser and are not shared. */
-const NICK_A=['살랑','소담','몽글','포근','고요한','느린','여린','은은한','잔잔한','다정한','따스한','아늑한'],NICK_B=['구름','이슬','바람','달빛','잎새','여울','윤슬','꽃잎','노을','안개','햇살','물결'];
-const ALL_NICKS=NICK_A.flatMap(a=>NICK_B.map(b=>a+b));
+/* ---------- multiplayer: one shared realtime server (server.js, WebSocket) ----------
+   The server owns everything that must be the same for everyone on a server ("채널"): who is connected, the 88-person cap,
+   nicknames (unique per server, assigned by the server), session resume after a reload, seats, the 팽주 role, each player's
+   tea and remaining infusions, every guest cup, and table events (serve, drink, 함께 한 모금).
+   Where the server is:  ?ws=wss://…  in the link  >  <meta name="chayou-server">  >  the same host that served this page.
+   Which server/channel: ?server=N in the link (default 1).  The link in the address bar always carries it, so a copied link
+   brings friends into the same server.  A full server is announced, never silently swapped for another one. */
 function nameSprite(txt){
   // Korean web fonts arrive in unicode-range slices, so drawing before every glyph's slice is loaded mixes two fonts
   // (e.g. 연 and 잎 at different sizes).  Draw once in the system Korean font, then redraw when the web font has those glyphs.
@@ -2065,70 +2067,93 @@ function nameSprite(txt){
 function setNameTag(ch,txt){if(ch.nameTag){ch.root.remove(ch.nameTag);ch.nameTag.material.map.dispose();ch.nameTag.material.dispose();}if(!txt){ch.nameTag=null;return;}
   const sp=nameSprite(txt);if(ch.tagY===undefined){ch.root.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(ch.root);ch.tagY=(bb.max.y-ch.root.position.y)/ch.root.scale.y+.13;}
   sp.position.y=ch.tagY;ch.root.add(sp);ch.nameTag=sp;}
-const NET=(()=>{const CAP=88,GRACE=60000,APP='chayou-dawon-2026',KEY='chayou-session';
-  const store={get(){try{return JSON.parse(sessionStorage.getItem(KEY)||'null');}catch(e){return null;}},set(v){try{sessionStorage.setItem(KEY,JSON.stringify(v));}catch(e){}}};
-  const prev=store.get(),fresh=prev&&prev.uid&&Date.now()-(prev.ts||0)<GRACE;
-  const uid=fresh?prev.uid:(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));
-  let nick=fresh?prev.nick:null,claimAt=fresh?prev.at:0,ch=fresh&&prev.ch?prev.ch:1;
-  const members=new Map(),reserved=new Map(),byPeer=new Map();   // uid -> member, uid -> {nick,until}, peerId -> uid
-  let room=null,send={},sendT=0,last='',phase='connecting',moving=false,lib=null,observeT=null;
-  const info=t=>{const el=$('netInfo');if(el)el.textContent=t;};
-  const occupied=()=>members.size+[...reserved.keys()].filter(u=>!members.has(u)&&u!==uid).length+1;
-  const showInfo=()=>info(phase==='in'?`${nick} · ${ch}채널 · ${occupied()}/${CAP}명`:phase==='full'?`${ch}채널이 만원이에요 (${CAP}/${CAP}명) · ${ch+1}채널을 확인하는 중…`:phase==='solo'?`${nick} · 연결 안 됨 (이 화면에서만 정한 이름)`:`${ch}채널에 들어가는 중…`);
-  const save=()=>{if(nick)store.set({uid,nick,ch,at:claimAt,ts:Date.now()});};
-  setInterval(save,5000);addEventListener('pagehide',save);
-  const takenBy=n=>{for(const[u,M]of members)if(M.nick===n)return u;for(const[u,R]of reserved)if(R.nick===n&&u!==uid)return u;return null;};
-  function pickFree(){const free=ALL_NICKS.filter(n=>!takenBy(n));return free.length?free[Math.floor(Math.random()*free.length)]:null;}
+const NET=(()=>{
+  const q=new URLSearchParams(location.search);
+  const metaUrl=(document.querySelector('meta[name="chayou-server"]')||{}).content||'';
+  const sameHost=/^https?:$/.test(location.protocol)&&!/github\.io$/.test(location.hostname)?(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws':'';
+  const URL_WS=(q.get('ws')||metaUrl||sameHost).trim();
+  let ch=(q.get('server')||'1').replace(/[^0-9a-z-]/gi,'').slice(0,16)||'1';
+  const KEY='chayou-sid:';
+  const store={get(){try{return sessionStorage.getItem(KEY+ch);}catch(e){return null;}},set(v){try{sessionStorage.setItem(KEY+ch,v);}catch(e){}}};
+  let ws=null,status='idle',uid=null,nick=null,cap=88,started=false,retry=0,retryT=null,pingT=null,sendT=0,last='',moving=false;
+  const members=new Map();   // uid -> {uid,nick,look,c,tx,ty,tz,try,pose,m,seen,online,seat}
+  const info=()=>{const el=$('netInfo');if(!el)return;const n=[...members.values()].filter(M=>M.online).length+1;
+    el.textContent=status==='connected'?`${ch}채널 · ${n}/${cap}`:status==='connecting'?`접속 중… · ${ch}채널`:status==='reconnecting'?`재연결 중… · ${ch}채널`:status==='full'?`${ch}채널 만원 · ${cap}/${cap}`:status==='noserver'?'서버 미설정 · 혼자 보는 중':status==='failed'?'연결 실패 · 혼자 보는 중':'';
+    el.dataset.state=status;};
+  const setStatus=s=>{status=s;info();};
+  function shareUrl(){const u=new URL(location.href);u.searchParams.set('server',ch);if(q.get('ws'))u.searchParams.set('ws',q.get('ws'));return u.toString();}
+  function out(m){if(ws&&ws.readyState===1)ws.send(JSON.stringify(m));}
   function myState(){const top=me.seat?me.seat.top:.42;return{x:+me.x.toFixed(2),y:+me.y.toFixed(2),z:+me.z.toFixed(2),ry:+me.ry.toFixed(2),p:me.pose||'stand',st:+top.toFixed(2),m:moving?1:0,v:me.root.visible?1:0};}
-  function hiMsg(){const res=[...reserved].filter(([u])=>!members.has(u)).map(([u,R])=>[u,R.nick,R.until]);return{uid,nick,at:claimAt,look:ME_LOOK,res};}
-  function hello(to){if(phase==='in'&&send.hi)send.hi(hiMsg(),to);}
-  function avatarFor(M){if(M.c)return M.c;const c=makeChar(M.look||NPC_LOOKS[0]);scene.add(c.root);c.root.visible=false;M.c=c;M.tx=M.ty=M.tz=M.try=0;M.pose='stand';M.m=0;M.seen=false;setNameTag(c,M.nick);return c;}
-  function removeAvatar(M){if(!M.c)return;scene.remove(M.c.root);if(M.c.bubble){scene.remove(M.c.bubble.sp);M.c.bubble=null;}M.c=null;}
-  // a claim beats another for the same name if it is older; equal times fall back to the smaller uid
-  const beats=(atA,uA,atB,uB)=>atA<atB||(atA===atB&&uA<uB);
-  function onHi(h,peerId){if(!h||!h.uid||h.uid===uid)return;byPeer.set(peerId,h.uid);
-    for(const[u,n,until]of h.res||[])if(u!==uid&&!members.has(u)&&until>Date.now()&&!reserved.has(u))reserved.set(u,{nick:n,until});
-    let M=members.get(h.uid);if(!M){M={uid:h.uid};members.set(h.uid,M);}reserved.delete(h.uid);   // a returning session takes its own reservation back
-    const nameChanged=M.nick!==h.nick;M.peer=peerId;M.nick=h.nick;M.at=h.at;M.look=h.look;
-    if(phase==='in'){avatarFor(M);if(nameChanged)setNameTag(M.c,M.nick);
-      // the same name claimed twice: the newer claim gives way and picks another free one
-      if(nick&&h.nick===nick&&!beats(claimAt,uid,h.at,h.uid))claim(true);}
-    showInfo();if(phase==='in')checkFull();}
-  function onLeave(peerId){const u=byPeer.get(peerId);byPeer.delete(peerId);if(!u)return;const M=members.get(u);if(!M||M.peer!==peerId)return;
-    members.delete(u);removeAvatar(M);reserved.set(u,{nick:M.nick,until:Date.now()+GRACE});showInfo();}
-  function claim(repick){
-    // keep the restored/current name unless someone with an older claim (or a reservation) holds it; a newer holder will give way to us
-    const o=nick&&takenBy(nick),om=o&&members.get(o),keep=!repick&&nick&&(!o||(om&&beats(claimAt,uid,om.at,om.uid)));const n=keep?nick:pickFree();if(!n){phase='full';showInfo();return next();}
-    if(n!==nick||!claimAt)claimAt=Date.now();nick=n;setNameTag(me,nick);save();showInfo();if(send.hi)send.hi(hiMsg());}
-  function enter(){phase='in';claim(false);for(const M of members.values()){avatarFor(M);}last='';showInfo();checkFull();}
-  function next(){leave();ch+=1;nick=null;claimAt=0;setTimeout(()=>join(ch),400);}
-  function leave(){if(room){try{room.leave();}catch(e){}}room=null;for(const M of members.values())removeAvatar(M);members.clear();reserved.clear();byPeer.clear();send={};clearTimeout(observeT);}
-  function join(n){ch=n;phase='connecting';showInfo();
-    try{room=lib.joinRoom({appId:APP},'channel-'+n);}catch(e){phase='solo';if(!nick)nick=ALL_NICKS[Math.floor(Math.random()*ALL_NICKS.length)];setNameTag(me,nick);showInfo();return;}
-    const[sHi,gHi]=room.makeAction('hi'),[sSt,gSt]=room.makeAction('st'),[sMood,gMood]=room.makeAction('mood'),[sAsk,gAsk]=room.makeAction('ask');send={hi:sHi,st:sSt,mood:sMood,ask:sAsk};
-    room.onPeerJoin(id=>{if(phase==='in')hello(id);else sAsk(1,id);});room.onPeerLeave(onLeave);
-    gAsk((_,id)=>hello(id));gHi(onHi);
-    gSt((st,id)=>{const M=members.get(byPeer.get(id));if(!M||!M.c)return;M.tx=st.x;M.ty=st.y;M.tz=st.z;M.try=st.ry;M.m=st.m;M.c.root.visible=!!st.v;
-      if(!M.seen){M.seen=true;M.c.x=st.x;M.c.y=st.y;M.c.z=st.z;M.c.ry=st.ry;}
-      if(st.p!==M.pose){M.pose=st.p;setPose(M.c,st.p==='squat'?'squat':st.p==='sit'?'sit':'stand',st.st);}});
-    gMood((e,id)=>{const M=members.get(byPeer.get(id));if(M&&M.c)showMood(M.c,e);});
-    // listen first: learn who is here and which names are taken or reserved, then decide whether there is room
-    observeT=setTimeout(()=>{if(occupied()>CAP){phase='full';showInfo();toast(`${n}채널이 만원이에요 (${CAP}명). ${n+1}채널로 들어가요`);next();return;}enter();},3500);}
-  // two browsers entering together can push a channel past 88: the most recent arrival leaves for the next channel
-  function checkFull(){if(phase!=='in'||occupied()<=CAP)return;const order=[...[...members.values()].map(M=>[M.at,M.uid]),[claimAt,uid]].sort((a,b)=>a[0]-b[0]||(a[1]<b[1]?-1:1));
-    if(order.findIndex(o=>o[1]===uid)>=CAP-[...reserved.keys()].filter(u=>!members.has(u)).length){toast(`${ch}채널이 만원이 되어 ${ch+1}채널로 옮겨요`);next();}}
-  setInterval(()=>{const now=Date.now();let ch_=false;for(const[u,R]of reserved)if(R.until<now){reserved.delete(u);ch_=true;}if(ch_)showInfo();},5000);
-  const start=()=>import('https://cdn.jsdelivr.net/npm/trystero@0.21.8/+esm').then(m=>{lib=m;join(ch);}).catch(()=>{phase='solo';nick=nick||ALL_NICKS[Math.floor(Math.random()*ALL_NICKS.length)];setNameTag(me,nick);showInfo();});
-  showInfo();
+  function avatar(P){if(P.c)return P.c;const c=makeChar(P.look&&P.look.robe?P.look:NPC_LOOKS[0]);c.isRemote=true;scene.add(c.root);P.c=c;P.pose='stand';P.seen=false;setNameTag(c,P.nick);
+    if(P.st)applySt(P,P.st,true);else c.root.visible=false;return c;}
+  function applySt(P,s,snap){P.tx=s.x;P.ty=s.y;P.tz=s.z;P.try=s.ry;P.m=s.m;const c=P.c;if(!c)return;c.root.visible=!!s.v&&P.online!==false;
+    if(snap||!P.seen){P.seen=true;c.x=s.x;c.y=s.y;c.z=s.z;c.ry=s.ry;c.root.position.set(c.x,c.y,c.z);}
+    if(s.p!==P.pose){P.pose=s.p;setPose(c,s.p==='squat'?'squat':s.p==='sit'?'sit':'stand',s.st);}}
+  function drop(P){if(P.c){scene.remove(P.c.root);if(P.c.bubble){scene.remove(P.c.bubble.sp);P.c.bubble=null;}}
+    for(const s of seats)if(s.occ&&s.occ===P.c)s.occ=null;members.delete(P.uid);}
+  function seatAt(ti,k){const T=tables[ti];return T&&seatOf(T,k);}
+  function applySeat(ti,k,who){const s=seatAt(ti,k);if(!s)return;
+    if(who===uid){return;}
+    if(s.occ&&s.occ.isRemote)s.occ=null;
+    const P=who&&members.get(who);if(P){avatar(P);s.occ=P.c;P.c.seat=s;}
+    else if(s.occ&&s.occ!==me)s.occ=null;}
+  function upsert(p){let P=members.get(p.uid);if(!P){P={uid:p.uid};members.set(p.uid,P);}P.nick=p.nick;P.look=p.look;P.online=p.online!==false;
+    if(P.online){avatar(P);if(p.st)applySt(P,p.st,!P.seen);}else if(P.c)P.c.root.visible=false;return P;}
+  function onMsg(m){
+    switch(m.t){
+      case 'welcome':{uid=m.uid;nick=m.nick;cap=m.cap||88;ch=m.ch;store.set(m.sid);retry=0;
+        history.replaceState(null,'',shareUrl());
+        for(const P of [...members.values()])drop(P);
+        for(const p of m.players)upsert(p);
+        m.tables.forEach(tb=>tb.seats.forEach((who,k)=>applySeat(tb.ti,k,who)));
+        if(m.me&&m.me.tea){me.tea=m.me.tea;me.teaLeft=m.me.teaLeft;}
+        if(m.resumed&&m.me&&m.me.seat&&!me.seat)out({t:'stand'});   // this page starts standing; let go of the old seat
+        if(me.seat)out({t:'sit',ti:me.seat.table.i,k:me.seat.k});
+        setNameTag(me,nick);setStatus('connected');last='';
+        if(!m.resumed)toast(`${nick} 님, ${ch}채널에 들어왔어요`);break;}
+      case 'full':{cap=m.cap||cap;setStatus('full');showFull(m);try{ws.close();}catch(e){}break;}
+      case 'enter':case 'back':{upsert(m.p);if(m.p.seat)applySeat(m.p.seat[0],m.p.seat[1],m.p.uid);info();break;}
+      case 'away':{const P=members.get(m.uid);if(P){P.online=false;if(P.c)P.c.root.visible=false;}info();break;}
+      case 'leave':{const P=members.get(m.uid);if(P)drop(P);info();break;}
+      case 'st':{const P=members.get(m.uid);if(P){if(!P.c)avatar(P);applySt(P,m.s,false);}break;}
+      case 'seat':applySeat(m.ti,m.k,m.uid);break;
+      case 'seatDenied':{const s=seatAt(m.ti,m.k);if(s&&me.seat===s){s.occ=null;me.seat=null;setPose(me,'stand');me.x=s.x-Math.sin(s.ry)*.6;me.z=s.z-Math.cos(s.ry)*.6;me.y=0;lastHud='';}
+        toast(m.why==='noTea'?'팽주가 되려면 먼저 찻장에서 차를 골라 주세요':'이미 다른 분이 앉은 자리예요');break;}
+      case 'player':{if(m.uid===uid){me.tea=m.tea;me.teaLeft=m.teaLeft;lastHud='';}break;}
+      case 'serve':{if(m.by===uid)break;const T=tables[m.ti];if(!T)break;if(m.tea&&TEAS[m.tea])setTeaColor(T,m.tea);
+        for(const k of m.ks){const c=T.cups[k];if(c&&c.state!=='host'){c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}}
+        T.pitcherLevel=1;startServe(T);break;}
+      case 'drink':{const P=members.get(m.uid),T=tables[m.ti],c=T&&T.cups[m.k];if(P&&P.c&&c){if(c.state!=='guest'){c.state='guest';c.level=1;c.rest=c.guestPos.clone();c.g.position.copy(c.rest);}startDrink(P.c,c);}break;}
+      case 'cupback':{const T=tables[m.ti];const c=T&&T.cups[m.k];if(c&&c.state==='guest'){c.level=0;sendCup(c,false);}break;}
+      case 'cheers':{if(m.by===uid)break;cheersAt(tables[m.ti]);break;}
+      case 'mood':{const P=members.get(m.uid);if(P&&P.c)showMood(P.c,m.e);break;}
+    }}
+  function showFull(m){const pn=$('fullPanel');if(!pn)return;$('fullText').textContent=`${m.ch}채널은 지금 만원이에요 (${m.count}/${m.cap}명).`;
+    const b=$('fullGo');if(m.alt&&m.alt!==m.ch){b.hidden=false;b.textContent=`${m.alt}채널로 들어가기`;b.onclick=()=>{const u=new URL(location.href);u.searchParams.set('server',m.alt);location.href=u.toString();};}else b.hidden=true;pn.hidden=false;}
+  function connect(){clearTimeout(retryT);if(!URL_WS){setStatus('noserver');return;}
+    setStatus(retry?'reconnecting':'connecting');
+    try{ws=new WebSocket(URL_WS);}catch(e){scheduleRetry();return;}
+    const sock=ws;
+    sock.onopen=()=>{sock.send(JSON.stringify({t:'hello',ch,sid:store.get(),look:ME_LOOK}));clearInterval(pingT);pingT=setInterval(()=>out({t:'ping'}),15000);};
+    sock.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(x){return;}onMsg(m);};
+    sock.onclose=()=>{if(ws!==sock)return;clearInterval(pingT);if(status==='full')return;
+      for(const P of members.values())if(P.c)P.c.root.visible=false;scheduleRetry();};
+    sock.onerror=()=>{};}
+  function scheduleRetry(){retry++;if(retry>6&&status!=='connected'&&!uid){setStatus('failed');}else setStatus('reconnecting');retryT=setTimeout(connect,Math.min(15000,1000*Math.pow(1.6,retry)));}
+  addEventListener('online',()=>{if(status!=='connected'&&status!=='full'){retry=0;connect();}});
   return{
-    start(){if(!lib&&phase==='connecting')start();},
-    update(dt,mv){moving=mv;for(const M of members.values()){const c=M.c;if(!c)continue;const k=Math.min(1,dt*8);c.x+=(M.tx-c.x)*k;c.y+=(M.ty-c.y)*k;c.z+=(M.tz-c.z)*k;c.ry=lerpAngle(c.ry,M.try,k);
-        c.root.updateMatrixWorld(true);updateChar(c,dt,!!M.m&&M.pose==='stand');}
-      if(phase!=='in'||!send.st)return;sendT-=dt;const st=myState(),key=JSON.stringify(st);if(sendT<=0&&(key!==last||sendT<-1)){send.st(st);last=key;sendT=.12;}},
-    mood(e){if(phase==='in'&&send.mood)send.mood(e);},
-    others(){return[...members.values()].filter(M=>M.c&&M.seen).map(M=>({x:M.tx,z:M.tz,nick:M.nick}));},
-    get uid(){return uid;},get nick(){return nick;}
+    start(){if(started)return;started=true;info();connect();},
+    get online(){return status==='connected';},get uid(){return uid;},get nick(){return nick;},
+    update(dt,mv){moving=mv;for(const P of members.values()){const c=P.c;if(!c||!P.seen)continue;const k=Math.min(1,dt*8);c.x+=(P.tx-c.x)*k;c.y+=(P.ty-c.y)*k;c.z+=(P.tz-c.z)*k;c.ry=lerpAngle(c.ry,P.try,k);
+        c.root.updateMatrixWorld(true);updateChar(c,dt,!!P.m&&P.pose==='stand');}
+      if(status!=='connected')return;sendT-=dt;const st=myState(),key=JSON.stringify(st);if(sendT<=0&&(key!==last||sendT<-1.5)){out({t:'st',s:st});last=key;sendT=.1;}},
+    mood(e){out({t:'mood',e});},
+    others(){return[...members.values()].filter(P=>P.online&&P.c&&P.seen).map(P=>({x:P.tx,z:P.tz,nick:P.nick}));},
+    sit(seat){out({t:'sit',ti:seat.table.i,k:seat.k});},stand(){out({t:'stand'});},tea(key){out({t:'tea',key});},
+    brewed(){out({t:'brewed'});},drink(){out({t:'drink'});},cupback(){out({t:'cupback'});},cheers(){out({t:'cheers'});},
+    get members(){return members;}
   };})();
+
 // entry: pick 여성/남성 once per session (a reload restores the choice), then join the channel
 {const panel=$('genderPanel'),go=g=>{try{sessionStorage.setItem('chayou-gender',g);}catch(e){}ME_LOOK.style=g==='m'?'top':'bun';if(g==='m'&&ME_LOOK.face==='lash')ME_LOOK.face='round';
     setHair(me,ME_LOOK.style,ME_LOOK);if(me.headPivot.userData.face){setFace(me,ME_LOOK.face);me.headPivot.userData.faceKind=ME_LOOK.face;}if(NET.nick)setNameTag(me,NET.nick);panel.hidden=true;NET.start();canvas.focus();};
@@ -2237,7 +2262,7 @@ function openTeaPanel(){const list=$('teaList');list.innerHTML='';
   if(me.tea){const t=TEAS[me.tea];$('teaList').insertAdjacentHTML('beforeend',`<p>지금 ${t.full}를 가지고 있어요 (남은 우림 ${me.teaLeft}번). 다 우린 뒤에 새 차를 가져올 수 있어요.</p>`);}
   for(const k of TEA_KEYS){const t=TEAS[k],b=document.createElement('button');b.type='button';b.className='teaItem'+(me.tea===k?' on':'');b.disabled=!!me.tea;
     b.innerHTML=`<i class="sw" style="background:#${t.liquor.toString(16).padStart(6,'0')}"></i><div><b>${t.full}</b><span>${t.han}</span></div>`;
-    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=3;$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}를 챙겼어요. 세 번 우릴 수 있어요`);canvas.focus();});list.appendChild(b);}
+    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=3;NET.tea(k);$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}를 챙겼어요. 세 번 우릴 수 있어요`);canvas.focus();});list.appendChild(b);}
   openCabinetDoors();const tok=teaOpenTok=(teaOpenTok||0)+1;setTimeout(()=>{if(tok===teaOpenTok&&nearCabinet())$('teaPanel').hidden=false;},650);}
 let teaOpenTok=0;
 $('teaClose').addEventListener('click',()=>{$('teaPanel').hidden=true;closeCabinetDoors();canvas.focus();});
@@ -2259,7 +2284,7 @@ function brewNext(){const b=me.brew,T=b.T;
   else if(b.step==='watered'){b.step='closing';b.t=0;}
   else if(b.step==='closed'){b.step='pouring';b.t=0;T.busy=true;}
   else if(b.step==='poured'){me.brew=null;cam.mode='follow';me.root.visible=true;$('brewCap').hidden=true;T.ready=true;T.potWater.visible=false;
-    me.teaLeft--;const nm=TEAS[me.tea].name;if(me.teaLeft<=0)me.tea=null;
+    NET.brewed();me.teaLeft--;const nm=TEAS[me.tea].name;if(me.teaLeft<=0)me.tea=null;
     if(T.cups.some(c=>c&&c.k>0&&c.state==='host')){startServe(T);toast(me.tea?`${nm}를 손님들께 따라 드려요 · ${me.teaLeft}번 남음`:`${nm}를 손님들께 따라 드려요 · 다음엔 찻장에서 새 차를 가져오세요`);}
     else toast(me.tea?`앞에 놓인 찻잔이 없어요 · ${nm} ${me.teaLeft}번 남음`:`앞에 놓인 찻잔이 없어요 · 다음엔 찻장에서 새 차를 가져오세요`);}
   lastHud='';}
@@ -2309,11 +2334,11 @@ const tapMark=new THREE.Mesh(new THREE.RingGeometry(.12,.18,24),new THREE.MeshBa
 function sitMe(seat){
   if(seat.occ&&seat.occ!==me){toast('이미 다른 분이 앉은 자리예요');return;}
   if(seat.host&&!me.tea){toast('팽주가 되려면 먼저 찻장에서 차를 골라 주세요');me.route=[];me.seatTarget=null;ring.visible=false;return;}
-  if(me.seat)me.seat.occ=null;seatChar(me,seat);me.route=[];me.seatTarget=null;ring.visible=false;
+  if(me.seat)me.seat.occ=null;seatChar(me,seat);me.route=[];me.seatTarget=null;ring.visible=false;NET.sit(seat);
   cam.yaw=Math.atan2(seat.x-seat.table.cx,seat.z-seat.table.cz)+.78;cam.pitch=.34;cam.dist=3.0;
   const T=seat.table;if(seat.host)setTeaColor(T,me.tea);toast(seat.host?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}를 우려 보세요`:(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
 function standMe(){
-  if(!me.seat||me.action)return;const s=me.seat;s.occ=null;if(!s.host){const c=s.table.cups[s.k];if(c.state==='guest'||c.state==='toGuest'){c.level=0;sendCup(c,false);}}me.seat=null;setPose(me,'stand');
+  if(!me.seat||me.action)return;const s=me.seat;s.occ=null;if(!s.host){const c=s.table.cups[s.k];if(c.state==='guest'||c.state==='toGuest'){c.level=0;sendCup(c,false);}}me.seat=null;setPose(me,'stand');NET.stand();
   const nx=s.x-Math.sin(s.ry)*.6,nz=s.z-Math.cos(s.ry)*.6;me.x=nx;me.z=nz;me.y=0;}
 function goSeat(seat){
   if(me.seat===seat||me.mode==='boat'||me.brew)return;
@@ -2331,8 +2356,8 @@ function doAct(){
   if(me.seat&&!me.action){const s=me.seat,T=s.table;
     if(s.host){if(T.busy||T.serving>0||T.passing)return;if(!T.ready&&T.cups[0].state==='guest'&&T.cups[0].level>.1){startDrink(me,T.cups[0]);return;}if(T.ready){if(!T.cups.some(c=>c&&c.k>0&&c.state==='host')){toast('앞에 놓인 찻잔이 없어요');return;}startServe(T);toast(`${TEAS[T.teaType].name}를 손님들께 따라 드려요`);}else{if(!me.tea){toast('차를 다 우렸어요. 찻장에서 새 차를 가져와 주세요');return;}startBrew(T);}}
     else{const cup=T.cups[s.k];if(cup.state!=='guest')return;
-      if(cup.level>.1)startDrink(me,cup);
-      else{sendCup(cup,false);toast(seatOf(T,0).occ?'팽주에게 찻잔을 건넸어요':'찻잔을 팽주 자리에 돌려놓았어요. 팽주석이 비어 있어요');}}
+      if(cup.level>.1){startDrink(me,cup);NET.drink();}
+      else{sendCup(cup,false);NET.cupback();toast(seatOf(T,0).occ?'팽주에게 찻잔을 건넸어요':'찻잔을 팽주 자리에 돌려놓았어요. 팽주석이 비어 있어요');}}
   }else if(!me.seat&&me.mode==='walk'&&nearCabinet())openTeaPanel();
   else if(!me.seat&&me.mode==='walk'&&placeNow()==='dock')boardFerry(false);
 }
@@ -2386,7 +2411,8 @@ $('moodBtn').addEventListener('click',()=>{$('moodBar').hidden=!$('moodBar').hid
 const onDock=(x,z)=>x>=DOCK.x0-.2&&x<=DOCK.x1+.2&&z>=DOCK.z0-.3&&z<=DOCK.z1+.2;
 $('waitBtn').addEventListener('click',()=>{if(!(me.mode==='walk'&&placeNow()==='dock'))return;const others=NET.others().filter(o=>onDock(o.x,o.z));
   if(others.length>=1)boardFerry('people');else boardFerry(true);canvas.focus();});
-$('toastBtn').addEventListener('click',()=>{if(!me.seat)return;const T=me.seat.table;for(let k=0;k<NSEAT;k++){const o=seatOf(T,k).occ,c=T.cups[k];if(o){if(o.action&&o.action.type==='pour')continue;clearAction(o);startDrink(o,c);const g=T.npc&&T.npc.guests.find(x=>x.ch===o);if(g)g.delay=6;}}toast('다 함께 한 모금');lastHud='';canvas.focus();});
+function cheersAt(T){if(!T)return;for(let k=0;k<NSEAT;k++){const o=seatOf(T,k).occ,c=T.cups[k];if(o){if(o.action&&o.action.type==='pour')continue;clearAction(o);startDrink(o,c);const g=T.npc&&T.npc.guests.find(x=>x.ch===o);if(g)g.delay=6;}}toast('다 함께 한 모금');lastHud='';}
+$('toastBtn').addEventListener('click',()=>{if(!me.seat)return;cheersAt(me.seat.table);NET.cheers();canvas.focus();});
 $('snackBtn').addEventListener('click',()=>{if(me.seat&&!me.action)startSnack(me);canvas.focus();});
 $('standBtn').addEventListener('click',()=>{if(me.mode==='boat'){leaveFerry();}else if(me.mode==='gaze')endGaze();else if(me.mode==='rail')endRail();else standMe();canvas.focus();});
 function canGaze(){if(me.mode!=='walk'||me.seat||me.action)return false;return lakeZone();}
@@ -2409,8 +2435,8 @@ $('goBtn').addEventListener('click',()=>{const w=placeNow();if(me.seat&&me.actio
   if(w==='dock'||w==='stones')walkTo(0,-HALF+3);else walkTo(0,(DOCK.z0+DOCK.z1)/2);setMode('follow');});
 
 /* ---------- camera & input ---------- */
-const cam={yaw:Math.PI,pitch:.1,dist:isTouch?2.4:5.6,mode:'follow'};
-const camPos=new V3(me.x,me.y+(isTouch?.68:1.15)+Math.sin(.1)*cam.dist,me.z-cam.dist),camLook=new V3(me.x,me.y+(isTouch?.68+.2:1.15+.9),me.z);
+const cam={yaw:Math.PI,pitch:.1,dist:isTouch?6.4*.8:5.6,mode:'follow'};
+const camPos=new V3(me.x,me.y+1.15+Math.sin(.1)*cam.dist,me.z-cam.dist),camLook=new V3(me.x,me.y+1.15+.9,me.z);
 function setMode(m){if(me.brew)return;cam.mode=m;}
 const keys=new Set();
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;const k=e.key.toLowerCase();
@@ -2598,12 +2624,12 @@ function frame(){
   if(cam.mode==='fp'&&me.brew){fpView(tmpPos,tmpLook);}
   else if(cam.mode==='follow'){
     const atTable=me.seat&&me.seat.table&&!me.brew,fz=isTouch?.4:0,cx0=atTable?lerp(me.seat.table.cx,me.seat.x,fz):me.x,cz0=atTable?lerp(me.seat.table.cz,me.seat.z,fz):me.z;   // phones: aim between the table centre and your own seat, where the tea set is
-    const ty=atTable?.82:me.y+(isTouch?(me.seat||me.mode==='boat'?.62:.68):(me.seat||me.mode==='boat'?1.05:1.15));tmpLook.set(cx0,ty,cz0);   // phones aim at the body so the character is framed whole
+    const ty=atTable?.82:me.y+(me.seat||me.mode==='boat'?1.05:1.15);tmpLook.set(cx0,ty,cz0);
     const cp=Math.cos(cam.pitch);let dist=atTable?(isTouch?Math.max(cam.dist*.5,1.1):Math.max(cam.dist,2.2)):cam.dist;
     if(inRect(me.x,me.z,ROOM)){const sx=Math.sin(cam.yaw)*cp,sz=Math.cos(cam.yaw)*cp,lim=HALF-.45;
       if(sx>.01)dist=Math.min(dist,(lim-cx0)/sx);if(sx<-.01)dist=Math.min(dist,(-lim-cx0)/sx);if(sz>.01)dist=Math.min(dist,(lim-.4-cz0)/sz);
       dist=Math.min(dist,((atTable?3.4:3.3)-ty)/Math.max(.05,Math.sin(cam.pitch)));dist=Math.max(dist,1.2);}
-    tmpPos.set(cx0+Math.sin(cam.yaw)*cp*dist,ty+Math.sin(Math.max(cam.pitch,.06))*dist,cz0+Math.cos(cam.yaw)*cp*dist);tmpLook.y+=Math.max(0,.3-cam.pitch)*(isTouch&&!atTable?1.0:4.5);
+    tmpPos.set(cx0+Math.sin(cam.yaw)*cp*dist,ty+Math.sin(Math.max(cam.pitch,.06))*dist,cz0+Math.cos(cam.yaw)*cp*dist);tmpLook.y+=Math.max(0,.3-cam.pitch)*4.5;
     if(inRect(me.x,me.z,ROOM)){tmpPos.y=Math.min(tmpPos.y,3.4);tmpPos.x=clamp(tmpPos.x,-HALF+.4,HALF-.4);tmpPos.z=clamp(tmpPos.z,-HALF-6,HALF-.45);}
     // after letting a sky lantern go, keep it in view until it fades out of sight
     if(lanternWatch){if(!lanternWatch.g.parent||me.mode!=='walk'||me.seat||keys.size||(drag&&drag.moved))lanternWatch=null;else{const P=lanternWatch.g.position,dx=P.x-me.x,dz=P.z-me.z,l=Math.hypot(dx,dz)||1;
@@ -2626,5 +2652,6 @@ function frame(){
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+if(new URLSearchParams(location.search).has('debug'))window.__chayou={me,NET,tables,seats,seatOf,sitMe,TEAS,camera};   // test hook, only with ?debug in the link
 })();
 </script>
