@@ -2272,7 +2272,7 @@ function openTeaPanel(){const list=$('teaList');list.innerHTML='';
   if(me.tea){const t=TEAS[me.tea];$('teaList').insertAdjacentHTML('beforeend',`<p>지금 ${t.full}를 가지고 있어요 (남은 우림 ${me.teaLeft}번). 다 우린 뒤에 새 차를 가져올 수 있어요.</p>`);}
   for(const k of TEA_KEYS){const t=TEAS[k],b=document.createElement('button');b.type='button';b.className='teaItem'+(me.tea===k?' on':'');b.disabled=!!me.tea;
     b.innerHTML=`<i class="sw" style="background:#${t.liquor.toString(16).padStart(6,'0')}"></i><div><b>${t.full}</b><span>${t.han}</span></div>`;
-    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=3;me.brewedAt=null;NET.tea(k);$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}를 챙겼어요. 세 번 우릴 수 있어요`);canvas.focus();});list.appendChild(b);}
+    b.addEventListener('click',()=>{if(me.tea)return;me.tea=k;me.teaLeft=3;me.brewedAt=null;NET.tea(k);me.route=[];me.backStep={left:1.8,ry:Math.atan2(-1.1-me.x,CAB.z-me.z)};$('teaPanel').hidden=true;setTimeout(closeCabinetDoors,500);lastHud='';toast(`${t.full}를 챙겼어요. 세 번 우릴 수 있어요`);canvas.focus();});list.appendChild(b);}
   openCabinetDoors();const tok=teaOpenTok=(teaOpenTok||0)+1;setTimeout(()=>{if(tok===teaOpenTok&&nearCabinet())$('teaPanel').hidden=false;},650);}
 let teaOpenTok=0;
 $('teaClose').addEventListener('click',()=>{$('teaPanel').hidden=true;closeCabinetDoors();canvas.focus();});
@@ -2550,7 +2550,11 @@ function frame(){
   let moving=false;
   if(me.mode==='gaze'&&keys.size)endGaze();
   if(me.mode==='rail'&&keys.size)endRail();
-  if(me.mode==='walk'){
+  // after taking tea from the cabinet: four small steps backwards, still facing the cabinet
+  if(me.backStep&&(keys.size||me.mode!=='walk'||me.seat))me.backStep=null;
+  if(me.backStep){const B=me.backStep,st=Math.min(B.left,1.35*dt),bx=-Math.sin(B.ry),bz=-Math.cos(B.ry),ox=me.x,oz=me.z;me.ry=lerpAngle(me.ry,B.ry,Math.min(1,dt*10));
+    tryMove(me,me.x+bx*st,me.z+bz*st);B.left-=st;moving=true;if(B.left<=1e-3||Math.hypot(me.x-ox,me.z-oz)<st*.3)me.backStep=null;}
+  else if(me.mode==='walk'){
     let mx=0,mz=0;if(keys.has('w')||keys.has('arrowup'))mz+=1;if(keys.has('s')||keys.has('arrowdown'))mz-=1;if(keys.has('d')||keys.has('arrowright'))mx+=1;if(keys.has('a')||keys.has('arrowleft'))mx-=1;
     const speed=3.2;
     if((mx||mz)&&!(me.seat&&me.action)){
