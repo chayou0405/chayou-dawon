@@ -124,7 +124,6 @@ function onMessage(conn, m) {
       if (holder === p.uid) { send(conn.ws, { t: 'seat', ti, k, uid: p.uid, v: c.seatVer[ti][k] }); break; }   // already mine: just confirm
       if (p.seat && (p.seat[0] !== ti || p.seat[1] !== k)) freeSeat(c, p);
       p.seat = [ti, k];
-      if (k === 0) c.tables[ti].tea = p.tea;
       setSeat(c, ti, k, p.uid); L('sit', { uid: p.uid, cid: conn.cid, ch: c.id, seat: seatId(p.seat) });
       broadcast(c, { t: 'table', ...tableState(c, ti) });
       // a new guest at a table whose host has already brewed gets a cup straight away
@@ -138,7 +137,7 @@ function onMessage(conn, m) {
         // the host does nothing for 3 seconds (does not start brewing): tea is poured from the fair cup to the new guest
         if (h && h.tea && h.teaLeft > 0) setTimeout(() => {
           if (c.seats[ti][k] !== p.uid || c.seats[ti][0] !== hostUid || T.brewed || T.brewing || T.cups[k]) return;
-          T.brewed = true; T.tea = h.tea; h.brewedAt = ti; T.cups[k] = SIPS;
+          T.brewed = true; T.tea = T.tea || h.tea; h.brewedAt = ti; T.cups[k] = SIPS;   // what is in the fair cup: the table's last brewed tea
           L('autoPour', { uid: p.uid, host: hostUid, ch: c.id, seat: seatId([ti, k]) });
           broadcast(c, { t: 'player', uid: h.uid, tea: h.tea, teaLeft: h.teaLeft, brewedAt: h.brewedAt });
           broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid });

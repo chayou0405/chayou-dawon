@@ -174,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0040</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0100</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -1162,7 +1162,9 @@ function setVessel(T,key,idle){const kind=VESSEL_OF[key]||'clay';
   V.g.position.copy(V.rest);V.g.rotation.set(0,Math.PI/2,0);V.lid.position.copy(V.lidRest);V.lid.rotation.set(0,0,0);
   for(const l of V.potLeaves)l.visible=false;V.potWater.visible=false;if(V.vol)V.vol.visible=false;
   if(idle!==false)glassIdle(T);}
-function setTeaColor(T,key,idle){const t=TEAS[key];T.teaType=key;if(T.vessels)setVessel(T,key,false);T.liq.color.setHex(t.liquor);T.liq.opacity=key==='shu'?.86:key==='dianhong'?.74:.62;T.liq.depthWrite=false;
+// the colour of the tea in the cups and fair cup (separate, so a new tea only shows once it has actually been brewed)
+function setLiquor(T,key){const t=TEAS[key];if(!t)return;T.liqType=key;T.liq.color.setHex(t.liquor);T.liq.opacity=key==='shu'?.86:key==='dianhong'?.74:.62;T.liq.depthWrite=false;}
+function setTeaColor(T,key,idle,keepLiquor){const t=TEAS[key];T.teaType=key;if(T.vessels)setVessel(T,key,false);if(!keepLiquor)setLiquor(T,key);
   for(const l of T.pitLeaves){l.m.geometry=WET_GEO[t.shape];l.m.material.color.setHex(t.wet);}for(const l of T.potLeaves){l.geometry=LEAF_GEO[t.shape];l.material.color.setHex(t.leaf);}if(T.vessels&&idle!==false)glassIdle(T);}
 /* ---------- dagwa: sandwich cookies in lobed shapes, served on flower-shaped plates ---------- */
 function lobed(n,r,depth,seg=96){const sh=new THREE.Shape();for(let i=0;i<=seg;i++){const a=i/seg*Math.PI*2,rr=r*(1-depth+depth*Math.pow(Math.abs(Math.cos(n*a/2)),.55));const x=Math.cos(a)*rr,y=Math.sin(a)*rr;i?sh.lineTo(x,y):sh.moveTo(x,y);}return sh;}
@@ -2373,7 +2375,7 @@ const kettle=(()=>{const g=new THREE.Group();const iron=M(0x2c2a28,{roughness:.5
 const waterStream=new THREE.Mesh(cyl(.005,.004,1,6),new THREE.MeshStandardMaterial({color:0xdfeef0,transparent:true,opacity:.55,roughness:.05}));waterStream.visible=false;waterStream.layers.set(1);scene.add(waterStream);
 const BREW_TEXT={ready:['찻잎 넣기','다호 뚜껑을 열고 찻잎을 넣어요'],leafing:['','찻잎이 다호 속으로 들어가요'],leafDone:['물 붓기','찻잎 위로 뜨거운 물을 부어요'],watering:['','물이 차오르며 찻잎이 풀려요'],watered:['공도배에 따르기','뚜껑을 닫고 공도배에 따라요'],closing:['','뚜껑을 닫는 중'],
   closed:['유리 공도배에 따르기','충분히 우러났어요'],pouring:['','공도배에 따르는 중'],poured:['차 나누기','공도배의 차를 손님 찻잔에 나눠 따라요']};
-function startBrew(T){me.brew={T,step:'ready',t:0,tea:me.tea,auto:true,aw:0};NET.brewStep('start',me.tea);setTeaColor(T,me.tea,false);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);cam.mode='fp';me.root.visible=false;T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
+function startBrew(T){me.brew={T,step:'ready',t:0,tea:me.tea,auto:true,aw:0};NET.brewStep('start',me.tea);setTeaColor(T,me.tea,false,true);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);cam.mode='fp';me.root.visible=false;T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
   {const V=T.vessel,Rm=Math.max(.006,profR(V.prof,V.floor+.006)*.75-.011);T.leafPlan=T.potLeaves.map(()=>{const a=rnd()*Math.PI*2,r=Math.sqrt(rnd())*Rm;return{x:Math.cos(a)*r,z:Math.sin(a)*r,y:V.floor+.002+rnd()*.006,d:rnd()*.45,r:rnd()*6,sx:-.025-rnd()*.07,sz:(rnd()-.5)*.016};});}lastHud='';}
 function brewNext(){const b=me.brew,T=b.T;
   if(b.step==='ready'){b.step='leafing';b.t=0;NET.brewStep('leafing');}
@@ -2425,7 +2427,8 @@ function stepBrew(b,dt){const T=b.T,pot=T.pot,sc=b.scoop||scoop,kt=b.kettle||ket
     {const V=T.vessel;T.potLeaves.forEach((l,i)=>{const P=T.leafPlan[i];if(lv>0){const y=Math.max(P.y,Math.min(wy-.006,P.y+(wy-V.floor)*.5)-(i%3)*.005),rr=Math.max(.006,profR(V.prof,y)*.8-.011),r=Math.hypot(P.x,P.z),k=r>rr?rr/r:1;l.position.set(P.x*k,y,P.z*k);l.rotation.y+=dt*(.6+i%4*.2);}});}
     if(t>4.3){kt.visible=false;b.step='watered';lastHud='';}}
   else if(b.step==='closing'){const k=seg(t,0,.7);T.lid.position.lerpVectors(LID_ASIDE,T.lidRest,k);T.lid.position.y+=Math.sin(k*Math.PI)*.08;if(t>.75){T.lid.position.copy(T.lidRest);b.step='pouring';b.t=0;T.busy=true;lastHud='';}}
-  else if(b.step==='pouring'){const V=T.vessel,rest=T.potRest,pour=pourAbovePitcher(T,V.tip,TT+.27,V.tilt);
+  else if(b.step==='pouring'){if(T.liqType!==b.tea)setLiquor(T,b.tea);   // the newly brewed tea leaves the pot: from now on cups and fair cup show it
+    const V=T.vessel,rest=T.potRest,pour=pourAbovePitcher(T,V.tip,TT+.27,V.tilt);
     const lift=seg(t,0,.8),tilt=seg(t,.8,1.3)-seg(t,3.4,3.9),back=seg(t,3.9,4.7);
     pot.position.lerpVectors(rest,pour,lift);if(back>0)pot.position.lerpVectors(pour,rest,back);pot.rotation.set(0,Math.PI/2,-V.tilt*tilt);
     vesselPourPose(T,lift*(1-back),tilt);
@@ -2435,7 +2438,7 @@ function stepBrew(b,dt){const T=b.T,pot=T.pot,sc=b.scoop||scoop,kt=b.kettle||ket
 }
 // other players' brewing is replayed on this screen step by step (leaves, water, lid, fair cup) from the host's events
 const remoteBrews=new Map();
-function prepBrew(T,tea){setTeaColor(T,tea,false);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
+function prepBrew(T,tea){setTeaColor(T,tea,false,true);T.potWater.visible=false;T.potWater.material.color.setHex(0xdfeef0);T.pitcherLevel=0;for(const l of T.potLeaves)l.visible=false;
   const V=T.vessel,Rm=Math.max(.006,profR(V.prof,V.floor+.006)*.75-.011);T.leafPlan=T.potLeaves.map(()=>{const a=rnd()*Math.PI*2,r=Math.sqrt(rnd())*Rm;return{x:Math.cos(a)*r,z:Math.sin(a)*r,y:V.floor+.002+rnd()*.006,d:rnd()*.45,r:rnd()*6,sx:-.025-rnd()*.07,sz:(rnd()-.5)*.016};});}
 function startRemoteBrew(ti,tea){const T=tables[ti];if(!T||!TEAS[tea]||(me.brew&&me.brew.T===T))return;endRemoteBrew(ti);
   const b={T,step:'ready',t:0,tea,remote:true,scoop:scoop.clone(),kettle:kettle.clone(true),ws:waterStream.clone()};for(const o of[b.scoop,b.kettle,b.ws]){o.visible=false;scene.add(o);}
@@ -2477,7 +2480,7 @@ function sitMe(seat){
   if(seat.host&&!me.tea){toast('팽주가 되려면 먼저 찻장에서 차를 가져와 주세요');me.route=[];me.seatTarget=null;ring.visible=false;return;}
   if(me.seat)me.seat.occ=null;seatChar(me,seat);readyCup(seat.table,seat.k);me.route=[];me.seatTarget=null;ring.visible=false;NET.sit(seat);
   cam.yaw=Math.atan2(seat.x-seat.table.cx,seat.z-seat.table.cz)+.78;cam.pitch=.34;cam.dist=3.0;
-  const T=seat.table;if(seat.host&&me.tea)setTeaColor(T,me.tea);toast(seat.host?(me.tea?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}${eul(TEAS[me.tea].name)} 우려 보세요`:`${tableName(T.i)} 팽주석에 앉았어요. 찻장에서 차를 가져오면 우릴 수 있어요`):(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
+  const T=seat.table;toast(seat.host?(me.tea?`${tableName(T.i)} 팽주석에 앉았어요. '차 우리기'로 ${TEAS[me.tea].name}${eul(TEAS[me.tea].name)} 우려 보세요`:`${tableName(T.i)} 팽주석에 앉았어요. 찻장에서 차를 가져오면 우릴 수 있어요`):(seatOf(T,0).occ?`${tableName(T.i)} 손님석에 앉았어요. 팽주가 차를 내어 줄 거예요`:`${tableName(T.i)} 손님석에 앉았어요. 이 찻자리는 팽주가 비어 있어요`));}
 function standMe(){
   if(me.brew&&me.seat&&me.seat.host&&!me.action)leaveBrew();
   if(!me.seat||me.action)return;const s=me.seat;s.occ=null;if(!s.host)vanishCup(s.table.cups[s.k]);me.seat=null;setPose(me,'stand');NET.stand();
@@ -2568,7 +2571,7 @@ function replayAct(ch,kind,d){if(ch.action&&kind!=='toss')clearAction(ch);
 function serveOne(T,k,tea,tries=0){const c=T.cups[k];if(!c)return;readyCup(T,k);
   // the host is drinking (or busy with something else): finish that first, then pour from the fair cup
   {const h=seatOf(T,0).occ;if(T.serveAnim||T.passing||T.busy||(h&&h.action&&h.action.type!=='tap')){if(tries<40)setTimeout(()=>serveOne(T,k,tea,tries+1),400);return;}}
-  if(tea&&TEAS[tea]&&T.teaType!==tea)setTeaColor(T,tea);
+  if(tea&&TEAS[tea]&&(T.teaType!==tea||T.liqType!==tea))setTeaColor(T,tea);
   if(c.state!=='host'){c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}
   T.pitcherLevel=Math.max(T.pitcherLevel,.6);T.serveList=[c];T.serveAnim={i:0,t:0};T.serving=1;T.pitRest=T.pitRest||T.pitcher.position.clone();
   if(me.seat&&me.seat.table===T&&me.seat.k===k)toast('팽주가 차를 한 잔 내어 주었어요');else if(me.seat&&me.seat.host&&me.seat.table===T)toast('새 손님께 차를 한 잔 내어 드려요');}
