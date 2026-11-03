@@ -22,11 +22,37 @@ const A = ['살랑','소담','몽글','포근','고요한','느린','여린','�
 const B = ['구름','이슬','바람','달빛','잎새','여울','윤슬','꽃잎','노을','안개','햇살','물결'];
 const NICKS = A.flatMap(a => B.map(b => a + b));   // 144
 
+// NPC tea guests fill the hall while it is quiet and make room as people arrive.
+// up to 10 people: 10 NPCs, 20: 8, 30: 7, 40: 6, 50: 5, 60: 4, 70: 3, 80: 2, more: 1
+const npcCount = users => users <= 10 ? 10 : Math.max(1, 10 - Math.ceil(users / 10));
+// seats they take, in order (a host before its guests; the last ones leave first). Seat holder id: "npc:ti-k"
+const NPC_PLAN = [[0, 0], [0, 1], [0, 2], [4, 0], [4, 1], [7, 0], [7, 2], [0, 3], [4, 3], [7, 4]];
+const isNpc = h => typeof h === 'string' && h.startsWith('npc:');
+
 const channels = new Map();
 let cidSeq = 0;
 // dev log: one line per lifecycle event with user id, connection id, server(channel) id and seat
 function L(ev, o) { if (LOG) console.log(new Date().toISOString().slice(11, 23), ev, JSON.stringify(o)); }
 const seatId = s => s ? `T${s[0]}-${s[1]}` : null;
+function syncNpcs(c) {
+  const want = new Set(); let n = npcCount(c.players.size);
+  for (const [ti, k] of NPC_PLAN) {
+    if (n <= 0) break; const h = c.seats[ti][k];
+    if (h && !isNpc(h)) continue;                                       // a person sits there: skip this seat
+    if (k > 0) { const host = c.seats[ti][0]; if (!(want.has(ti + '-0') || (host && isNpc(host) && want.has(ti + '-0')))) continue; }   // NPC guests only at an NPC host's table
+    want.add(ti + '-' + k); n--;
+  }
+  // leave first (guests before hosts), then sit down
+  for (let ti = 0; ti < NTABLES; ti++) for (let k = NSEAT - 1; k >= 0; k--) {
+    const h = c.seats[ti][k]; if (!isNpc(h) || want.has(ti + '-' + k)) continue;
+    if (k > 0) c.tables[ti].cups[k] = 0; else { c.tables[ti].brewed = false; c.tables[ti].tea = null; }
+    setSeat(c, ti, k, null);
+  }
+  for (const key of want) { const [ti, k] = key.split('-').map(Number); if (c.seats[ti][k]) continue;
+    if (k === 0) { c.tables[ti].brewed = true; c.tables[ti].tea = null; }   // an NPC host always has tea in the fair cup
+    setSeat(c, ti, k, 'npc:' + key);
+  }
+}
 function channel(id) {
   let c = channels.get(id);
   if (!c) {
@@ -52,7 +78,7 @@ function freeSeat(c, p) {
   const [ti, k] = p.seat;
   if (c.seats[ti][k] === p.uid) {
     if (k > 0) c.tables[ti].cups[k] = 0;
-    if (k === 0) { c.tables[ti].ready = false; c.tables[ti].brewed = false; }
+    if (k === 0) { c.tables[ti].ready = false; c.tables[ti].brewed = false; c.tables[ti].brewing = false; }
     setSeat(c, ti, k, null); L('stand', { uid: p.uid, ch: c.id, seat: seatId(p.seat) });
   }
   p.seat = null;
@@ -62,6 +88,7 @@ function removePlayer(c, p, why) {
   freeSeat(c, p); c.players.delete(p.uid); c.bySid.delete(p.sid);
   c.retired.set(p.sid, { uid: p.uid, nick: p.nick, t: Date.now() });   // the same session coming back much later gets its id and name again
   broadcast(c, { t: 'leave', uid: p.uid });
+  syncNpcs(c);
   if (!c.players.size) channels.delete(c.id);
 }
 
@@ -106,6 +133,14 @@ function onMessage(conn, m) {
         setTimeout(() => { if (c.seats[ti][k] === p.uid && c.seats[ti][0] === hostUid) broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid }); }, 900);   // straight from the fair cup, no new infusion
       } else if (k > 0 && hostUid && hostUid !== p.uid && !T.brewed) {
         const h = c.players.get(hostUid); if (h) send(h.ws, { t: 'newGuest', ti, k });
+        // the host does nothing for 3 seconds (does not start brewing): tea is poured from the fair cup to the new guest
+        if (h && h.tea && h.teaLeft > 0) setTimeout(() => {
+          if (c.seats[ti][k] !== p.uid || c.seats[ti][0] !== hostUid || T.brewed || T.brewing || T.cups[k]) return;
+          T.brewed = true; T.tea = h.tea; h.brewedAt = ti; T.cups[k] = SIPS;
+          L('autoPour', { uid: p.uid, host: hostUid, ch: c.id, seat: seatId([ti, k]) });
+          broadcast(c, { t: 'player', uid: h.uid, tea: h.tea, teaLeft: h.teaLeft, brewedAt: h.brewedAt });
+          broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid });
+        }, 3000);
       }
       break;
     }
@@ -113,7 +148,7 @@ function onMessage(conn, m) {
     case 'brewed': {   // host serves an infusion: a full brew the first time at a table, afterwards poured from the fair cup
       if (!p.seat || p.seat[1] !== 0 || !(p.teaLeft > 0)) return;
       const ti = p.seat[0], T = c.tables[ti];
-      T.tea = p.tea; T.ready = true; T.brewed = true; p.teaLeft -= 1; p.brewedAt = ti; const tea = p.tea; if (p.teaLeft <= 0) { p.tea = null; p.brewedAt = null; }
+      T.tea = p.tea; T.ready = true; T.brewed = true; T.brewing = false; p.teaLeft -= 1; p.brewedAt = ti; const tea = p.tea; if (p.teaLeft <= 0) { p.tea = null; p.brewedAt = null; }
       broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
       // pouring follows immediately: every seated guest gets a full cup
       const ks = []; for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) { T.cups[k] = SIPS; ks.push(k); }
@@ -123,6 +158,7 @@ function onMessage(conn, m) {
     }
     case 'brewstep': {   // the host's brewing steps, replayed on everyone else's screen
       if (!p.seat || p.seat[1] !== 0 || !['start','leafing','watering','closing'].includes(m.step)) return;
+      if (m.step === 'start') c.tables[p.seat[0]].brewing = true;   // the host is busy brewing: no automatic pour
       broadcast(c, { t: 'brewstep', ti: p.seat[0], step: m.step, tea: m.step === 'start' ? p.tea : undefined, by: p.uid }, conn.ws); break;
     }
     case 'act': {   // a visible action (incense, sweets, offering, stone skipping, feeding, sky lantern) replayed for everyone
@@ -141,7 +177,7 @@ function onMessage(conn, m) {
       // the host has tea in the fair cup at this table: the empty cup is refilled and passed straight back,
       // without a new infusion (and without the host having to press anything)
       const hostUid = c.seats[ti][0];
-      if (hostUid && hostUid !== p.uid && T.brewed && T.tea) {
+      if (hostUid && hostUid !== p.uid && T.brewed && (T.tea || isNpc(hostUid))) {
         L('refill', { uid: p.uid, ch: c.id, seat: seatId([ti, k]) });
         setTimeout(() => { if (c.seats[ti][k] === p.uid && c.seats[ti][0] === hostUid && T.brewed && !T.cups[k]) { T.cups[k] = SIPS; broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid }); } }, 1500);
       }
@@ -203,6 +239,7 @@ function hello(conn, m) {
   L('enter', { uid: p.uid, cid: conn.cid, ch: id, nick, returning: !!old, inst: m.inst });
   send(conn.ws, { t: 'welcome', resumed: false, cid: conn.cid, uid: p.uid, sid: p.sid, nick, ch: id, cap: CAP, v: c.ver, me: pub(p), players: [...c.players.values()].filter(q => q !== p).map(pub), tables: c.tables.map((_, ti) => tableState(c, ti)) });
   broadcast(c, { t: 'enter', p: pub(p) }, conn.ws);
+  syncNpcs(c);
 }
 
 function onClose(conn) {

@@ -177,7 +177,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2340</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0000</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -920,6 +920,7 @@ function updateSkipStones(dt){for(let i=skipStones.length-1;i>=0;i--){const st=s
     else if(!overWater&&m.position.y<groundY(m.position.x,m.position.z)){scene.remove(m);skipStones.splice(i,1);}}}
 let errand=null,errandT=18;
 function updateErrand(dt){
+  return;   // NPC seats are decided by the server, so an NPC host never leaves its seat on its own
   if(!errand){errandT-=dt;if(errandT>0)return;errandT=45+rnd()*40;
     const cands=tables.filter(T=>T.npc&&T.npc.host&&!T.npc.host.action&&!T.busy&&T.serving<=0&&!T.passing&&![1,2,3,4].some(k=>seatOf(T,k).occ));if(!cands.length)return;
     const T=cands[Math.floor(rnd()*cands.length)],ch=T.npc.host,seat=ch.seat,B=nearestBay(seat.x),sx=rnd()<.5?B.a+1.12:B.b-1.12,tz=HALF-1.05;
@@ -2095,7 +2096,20 @@ const NET=(()=>{
   let bc=null,dupSeen=false;try{bc=new BroadcastChannel('chayou-tabs');}catch(e){}
   if(bc)bc.onmessage=e=>{const d=e.data||{};if(d.q==='who'&&d.inst!==INST&&d.sid&&d.sid===store.get()&&uid)bc.postMessage({a:'mine',to:d.inst});if(d.a==='mine'&&d.to===INST)dupSeen=true;};
   const short=u=>u?String(u).slice(0,8):null;
-  const seatV=new Map(),holders=new Map();   // "ti-k" -> last applied seat version / holder uid, as the server decided
+  const seatV=new Map(),holders=new Map();
+  // NPC tea guests: the server puts them in seats (holder "npc:ti-k"); every screen draws the same ones
+  const npcChars=new Map(),npcHash=h=>{let x=0;for(const ch of h)x=(x*31+ch.charCodeAt(0))|0;return Math.abs(x);};
+  function npcSit(s,h){let ch=npcChars.get(h);if(ch&&ch.seat===s)return;if(ch)npcLeave(h,true);const T=s.table,k=s.k;
+    ch=makeChar(k===0?HOST_LOOKS[T.i%HOST_LOOKS.length]:NPC_LOOKS[npcHash(h)%NPC_LOOKS.length]);ch.isNpc=true;scene.add(ch.root);setLayer(ch.root,1);
+    readyCup(T,k);seatChar(ch,s);chars.push(ch);npcChars.set(h,ch);log('npcSit',{seat:`T${T.i}-${k}`});
+    if(!T.npc)T.npc={host:null,guests:[],phase:'wait',timer:2+rnd()*4};
+    const c=T.cups[k];c.state='guest';c.level=1;c.rest=c.guestPos.clone();c.g.position.copy(c.rest);c.g.visible=true;   // already enjoying a cup
+    if(k===0){T.npc.host=ch;const keys=Object.keys(TEAS);setTeaColor(T,keys[T.i%keys.length]);T.pitcherLevel=1;}else T.npc.guests.push({ch,k,delay:1+rnd()*4});}
+  function npcLeave(h,quiet){const ch=npcChars.get(h);if(!ch)return;npcChars.delete(h);const s=ch.seat;clearAction(ch);scene.remove(ch.root);if(ch.bubble){scene.remove(ch.bubble.sp);ch.bubble=null;}
+    const i=chars.indexOf(ch);if(i>=0)chars.splice(i,1);
+    if(s){if(s.occ===ch)s.occ=null;const T=s.table;if(T.npc){if(T.npc.host===ch)T.npc.host=null;T.npc.guests=T.npc.guests.filter(g=>g.ch!==ch);if(!T.npc.host&&!T.npc.guests.length)T.npc=null;}
+      if(!quiet){if(s.k>0)vanishCup(T.cups[s.k]);else{const c=T.cups[0];c.vanishAt=null;c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}}}
+    log('npcLeave',{});}   // "ti-k" -> last applied seat version / holder uid, as the server decided
   const members=new Map();   // uid -> {uid,nick,look,c,tx,ty,tz,try,pose,m,seen,online,seat}
   const info=()=>{const el=$('netInfo');if(!el)return;const n=[...members.values()].filter(M=>M.online).length+1;
     el.textContent=status==='connected'?`${ch}채널 · ${n}/${cap}`:status==='connecting'?`접속 중… · ${ch}채널`:status==='reconnecting'?`재연결 중… · ${ch}채널`:status==='full'?`${ch}채널 만원 · ${cap}/${cap}`:status==='noserver'?'서버 미설정 · 혼자 보는 중':status==='failed'?'연결 실패 · 혼자 보는 중':'';
@@ -2128,11 +2142,14 @@ const NET=(()=>{
   // the local player loses a seat the server gave to someone else (or never gave): stand up beside it
   function unseatMe(s,why){if(me.seat!==s)return;log('unseatMe',{seat:`T${s.table.i}-${s.k}`,why});s.occ=null;me.seat=null;setPose(me,'stand');me.x=s.x-Math.sin(s.ry)*.6;me.z=s.z-Math.cos(s.ry)*.6;me.y=0;lastHud='';}
   // seat ownership comes only from the server; v is the server's version of that seat (older updates are dropped)
+  const isNpcH=h=>typeof h==='string'&&h.startsWith('npc:');let welcomeNpcs=null;
   function applySeat(ti,k,who,v){const s=seatAt(ti,k);if(!s)return;const key=ti+'-'+k;
     if(v!=null){const have=seatV.get(key)||0;if(v<have){log('seatStale',{seat:'T'+key,v,have});return;}seatV.set(key,v);}
     const prev=holders.get(key)||null;holders.set(key,who||null);
     if(prev!==(who||null))log('seat',{seat:'T'+key,uid:short(who),prev:short(prev),v});
     if(k===0&&!who)endRemoteBrew(ti);
+    if(prev&&prev!==who&&isNpcH(prev))npcLeave(prev);
+    if(isNpcH(who)){if(me.seat===s)unseatMe(s,'npc');if(s.occ&&s.occ!==me&&!s.occ.isNpc)s.occ=null;npcSit(s,who);if(welcomeNpcs)welcomeNpcs.add(who);return;}
     if(prev&&prev!==who){const Q=members.get(prev);if(Q&&Q.seat===s){Q.seat=null;if(Q.c)Q.c.seat=null;}if(!who&&k>0&&prev!==uid)vanishCup(s.table.cups[k]);}
     if(s.occ&&s.occ!==me&&!(who&&members.get(who)&&members.get(who).c===s.occ))s.occ=null;
     if(who===uid){if(me.seat===s)s.occ=me;return;}
@@ -2156,7 +2173,8 @@ const NET=(()=>{
         {const keep=new Set(m.players.map(p=>p.uid));for(const P of [...members.values()])if(!keep.has(P.uid))drop(P,'notInSnapshot');}   // reconcile, don't rebuild
         seatV.clear();holders.clear();for(const P of members.values())P.seat=null;
         for(const p of m.players)upsert(p,true);
-        m.tables.forEach(tb=>tb.seats.forEach((who,k)=>applySeat(tb.ti,k,who,tb.sv?tb.sv[k]:null)));
+        welcomeNpcs=new Set();m.tables.forEach(tb=>tb.seats.forEach((who,k)=>applySeat(tb.ti,k,who,tb.sv?tb.sv[k]:null)));
+        for(const h of [...npcChars.keys()])if(!welcomeNpcs.has(h))npcLeave(h);welcomeNpcs=null;   // NPCs not in the snapshot are gone
         if(m.me&&m.me.tea){me.tea=m.me.tea;me.teaLeft=m.me.teaLeft;me.brewedAt=m.me.brewedAt!=null?m.me.brewedAt:null;}else if(me.tea&&me.teaLeft>0)out({t:'tea',key:me.tea,left:me.teaLeft});
         {const sv=m.me&&m.me.seat&&seatAt(m.me.seat[0],m.me.seat[1]);
           if(me.seat)out({t:'sit',ti:me.seat.table.i,k:me.seat.k});   // keep (or re-claim) the seat this page is sitting on
@@ -2624,7 +2642,7 @@ canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointer
 canvas.addEventListener('wheel',e=>{e.preventDefault();cam.dist=clamp(cam.dist*(1+Math.sign(e.deltaY)*.1),me.seat?TABLE_ZOOM_MIN:2.4,16);},{passive:false});
 
 /* ---------- NPC tea service ---------- */
-function startServe(T){T.ready=false;T.serveList=T.cups.filter(c=>c&&c.k>0&&c.state==='host'&&seatOf(T,c.k).occ);if(!T.serveList.length)T.serveList=T.soloPour?[]:T.cups.filter(c=>c&&c.k>0&&c.state==='host');T.soloPour=false;
+function startServe(T){T.ready=false;const npcOnly=T.npcPour;T.npcPour=false;T.serveList=T.cups.filter(c=>c&&c.k>0&&c.state==='host'&&seatOf(T,c.k).occ&&(!npcOnly||seatOf(T,c.k).occ.isNpc));if(!T.serveList.length)T.serveList=T.soloPour?[]:T.cups.filter(c=>c&&c.k>0&&c.state==='host');T.soloPour=false;
   {const hc=T.cups[0];if(seatOf(T,0).occ&&hc.state!=='toGuest'&&hc.state!=='toHost'&&hc.level<.5){hc.state='host';hc.rest=hc.hostPos.clone();hc.g.position.copy(hc.rest);T.serveList.push(hc);}}T.serveAnim={i:0,t:0};T.serving=1;T.pitRest=T.pitRest||T.pitcher.position.clone();}
 // a guest leaves: the cup they were drinking from stays put for 3 seconds, then disappears (on every screen)
 function vanishCup(c){if(c&&c.k>0&&(c.state==='guest'||c.state==='toGuest'))c.vanishAt=performance.now()+3000;}
@@ -2657,14 +2675,14 @@ function updateTable(T,dt){
   // NPC host: pours whenever a seated guest's cup is waiting in front of them
   const anyGuest=[1,2,3,4].some(k=>seatOf(T,k).occ);
   if(n.host&&!anyGuest&&!T.busy&&T.serving<=0&&!T.passing&&!n.host.action){n.timer-=dt;if(n.timer<=0){const c=T.cups[0];
-      if(c.level>.5){startDrink(n.host,c);n.timer=5+rnd()*5;}else{T.soloPour=true;startPour(n.host,T);n.timer=3+rnd()*3;}}}
-  if(n.host&&anyGuest&&!T.busy&&T.serving<=0&&!T.passing){const waiting=T.cups.some(c=>c&&c.k>0&&c.state==='host'&&seatOf(T,c.k).occ);
-    if(waiting){n.timer-=dt;if(n.timer<=0){startPour(n.host,T);n.timer=1.5+rnd()*2;}}else n.timer=1.5+rnd()*2;}
+      if(c.level>.05){startDrink(n.host,c);n.timer=5+rnd()*5;}else{T.soloPour=true;startPour(n.host,T);n.timer=3+rnd()*3;}}}
+  if(n.host&&anyGuest&&!T.busy&&T.serving<=0&&!T.passing&&!T.serveAnim){const waiting=T.cups.some(c=>c&&c.k>0&&c.state==='host'&&seatOf(T,c.k).occ&&seatOf(T,c.k).occ.isNpc);
+    if(waiting){n.timer-=dt;if(n.timer<=0){T.npcPour=true;startPour(n.host,T);n.timer=1.5+rnd()*2;}}else n.timer=1.5+rnd()*2;}
   if(n.host&&!n.host.action&&!T.busy&&!T.serveAnim&&rnd()<dt*.03)startSnack(n.host);
-  if(n.host&&!n.host.action&&anyGuest){const hc=T.cups[0];n.sip=(n.sip||0)-dt;const sipping=n.guests.some(g=>g.ch.action&&g.ch.action.type==='drink');if(hc.state==='guest'&&hc.level>.5&&(sipping||n.sip<=-6)){startDrink(n.host,hc);n.sip=0;}}
+  if(n.host&&!n.host.action&&anyGuest){const hc=T.cups[0];n.sip=(n.sip||0)-dt;const sipping=n.guests.some(g=>g.ch.action&&g.ch.action.type==='drink');if(hc.state==='guest'&&hc.level>.05&&(sipping||n.sip<=-6)){startDrink(n.host,hc);n.sip=0;}}
   // NPC guests: drink when served, hand the cup back for more, nibble snacks
   for(const g of n.guests){if(g.ch.action)continue;const c=T.cups[g.k];g.delay-=dt;
-    if(c.state==='guest'&&c.level>.5&&g.delay<=0){startDrink(g.ch,c);g.delay=4+rnd()*6;}
+    if(c.state==='guest'&&c.level>.05&&g.delay<=0){startDrink(g.ch,c);g.delay=4+rnd()*6;}
     else if(c.state==='guest'&&c.level<=.05&&g.delay<=0){sendCup(c,false);g.delay=3+rnd()*4;}
     else if(g.delay<=0&&rnd()<dt*.04){startSnack(g.ch);g.delay=3+rnd()*4;}}
 }
