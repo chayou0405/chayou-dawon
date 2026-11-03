@@ -26,7 +26,7 @@ function channel(id) {
   if (!c) {
     c = { id, players: new Map(), bySid: new Map(),
       seats: Array.from({ length: NTABLES }, () => Array(NSEAT).fill(null)),
-      tables: Array.from({ length: NTABLES }, () => ({ tea: null, ready: false, cups: Array(NSEAT).fill(0) })) };
+      tables: Array.from({ length: NTABLES }, () => ({ tea: null, ready: false, brewed: false, cups: Array(NSEAT).fill(0) })) };
     channels.set(id, c);
   }
   return c;
@@ -44,7 +44,7 @@ function freeSeat(c, p) {
   if (c.seats[ti][k] === p.uid) {
     c.seats[ti][k] = null;
     if (k > 0) c.tables[ti].cups[k] = 0;
-    if (k === 0) c.tables[ti].ready = false;
+    if (k === 0) { c.tables[ti].ready = false; c.tables[ti].brewed = false; }
     broadcast(c, { t: 'seat', ti, k, uid: null });
   }
   p.seat = null;
@@ -82,13 +82,22 @@ function onMessage(conn, m) {
       c.seats[ti][k] = p.uid; p.seat = [ti, k];
       if (k === 0) c.tables[ti].tea = p.tea;
       broadcast(c, { t: 'seat', ti, k, uid: p.uid });
-      broadcast(c, { t: 'table', ...tableState(c, ti) }); break;
+      broadcast(c, { t: 'table', ...tableState(c, ti) });
+      // a new guest at a table whose host has already brewed gets a cup straight away
+      const hostUid = c.seats[ti][0], T = c.tables[ti];
+      if (k > 0 && hostUid && hostUid !== p.uid && T.brewed && !T.cups[k]) {
+        T.cups[k] = 1;
+        setTimeout(() => { if (c.seats[ti][k] === p.uid && c.seats[ti][0] === hostUid) broadcast(c, { t: 'serveOne', ti, k, tea: T.tea, by: hostUid }); }, 1200);
+      } else if (k > 0 && hostUid && hostUid !== p.uid && !T.brewed) {
+        const h = c.players.get(hostUid); if (h) send(h.ws, { t: 'newGuest', ti, k });
+      }
+      break;
     }
     case 'stand': freeSeat(c, p); break;
     case 'brewed': {   // host serves an infusion: a full brew the first time at a table, afterwards poured from the fair cup
       if (!p.seat || p.seat[1] !== 0 || !(p.teaLeft > 0)) return;
       const ti = p.seat[0], T = c.tables[ti];
-      T.tea = p.tea; T.ready = true; p.teaLeft -= 1; p.brewedAt = ti; const tea = p.tea; if (p.teaLeft <= 0) { p.tea = null; p.brewedAt = null; }
+      T.tea = p.tea; T.ready = true; T.brewed = true; p.teaLeft -= 1; p.brewedAt = ti; const tea = p.tea; if (p.teaLeft <= 0) { p.tea = null; p.brewedAt = null; }
       broadcast(c, { t: 'player', uid: p.uid, tea: p.tea, teaLeft: p.teaLeft, brewedAt: p.brewedAt });
       // pouring follows immediately: every seated guest gets a full cup
       const ks = []; for (let k = 1; k < NSEAT; k++) if (c.seats[ti][k]) { T.cups[k] = 1; ks.push(k); }

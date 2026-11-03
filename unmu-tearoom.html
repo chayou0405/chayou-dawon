@@ -2122,6 +2122,8 @@ const NET=(()=>{
         for(const k of m.ks){const c=T.cups[k];if(c&&c.state!=='host'){c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}}
         T.pitcherLevel=1;startServe(T);break;}
       case 'drink':{const P=members.get(m.uid),T=tables[m.ti],c=T&&T.cups[m.k];if(P&&P.c&&c){if(c.state!=='guest'){c.state='guest';c.level=1;c.rest=c.guestPos.clone();c.g.position.copy(c.rest);}startDrink(P.c,c);}break;}
+      case 'serveOne':{const T=tables[m.ti];if(T)serveOne(T,m.k,m.tea);break;}
+      case 'newGuest':{if(me.seat&&me.seat.host&&me.seat.table.i===m.ti)toast('새 손님이 앉았어요 · 차를 우려 한 잔 내어 주세요');break;}
       case 'cupback':{const T=tables[m.ti];const c=T&&T.cups[m.k];if(c&&c.state==='guest'){c.level=0;sendCup(c,false);}break;}
       case 'cheers':{if(m.by===uid)break;cheersAt(tables[m.ti]);break;}
       case 'act':{const P=members.get(m.uid);if(P&&P.c)replayAct(P.c,m.kind,m.d||{});break;}
@@ -2449,6 +2451,13 @@ function replayAct(ch,kind,d){if(ch.action&&kind!=='toss')clearAction(ch);
     const st={m,free:false,vx:0,vy:0,vz:0,sp:+d.sp||8,hops:0,max:d.max|0,sink:0,remote:true};skipStones.push(st);ch.action={type:'skip',t:0,dir,stone:st,thrown:false};}
   else if(kind==='toss'&&Array.isArray(d.p)){clearAction(ch);ch.action={type:'toss',t:0,P:new V3(d.p[0],LAKE.y,d.p[1]),thrown:false,hand:d.hand==='L'?'L':'R'};}
   else if(kind==='lantern'&&typeof d.txt==='string'){const L=makeLantern(d.txt.slice(0,40),d.kind==='worry'?'worry':'wish');ch.action={type:'lantern',t:0,L};}}
+// pour a single cup for a guest who just sat down (the host has already brewed at this table)
+function serveOne(T,k,tea,tries=0){const c=T.cups[k];if(!c)return;
+  if(T.serveAnim||T.passing||T.busy){if(tries<8)setTimeout(()=>serveOne(T,k,tea,tries+1),900);return;}
+  if(tea&&TEAS[tea]&&T.teaType!==tea)setTeaColor(T,tea);
+  if(c.state!=='host'){c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}
+  T.pitcherLevel=Math.max(T.pitcherLevel,.6);T.serveList=[c];T.serveAnim={i:0,t:0};T.serving=1;T.pitRest=T.pitRest||T.pitcher.position.clone();
+  if(me.seat&&me.seat.table===T&&me.seat.k===k)toast('팽주가 차를 한 잔 내어 주었어요');else if(me.seat&&me.seat.host&&me.seat.table===T)toast('새 손님께 차를 한 잔 내어 드려요');}
 function cheersAt(T){if(!T)return;for(let k=0;k<NSEAT;k++){const o=seatOf(T,k).occ,c=T.cups[k];if(o){if(o.action&&o.action.type==='pour')continue;clearAction(o);startDrink(o,c);const g=T.npc&&T.npc.guests.find(x=>x.ch===o);if(g)g.delay=6;}}toast('다 함께 한 모금');lastHud='';}
 $('toastBtn').addEventListener('click',()=>{if(!me.seat)return;cheersAt(me.seat.table);NET.cheers();canvas.focus();});
 $('snackBtn').addEventListener('click',()=>{if(me.seat&&!me.action){startSnack(me);NET.act('snack',{});}canvas.focus();});
