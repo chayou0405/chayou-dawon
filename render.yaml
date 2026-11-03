@@ -4,6 +4,7 @@ services:
     name: chayou-dawon
     runtime: node
     plan: free
+    autoDeploy: true   # redeploy on every push to main
     buildCommand: "true"
     startCommand: node server.js
     healthCheckPath: /health

@@ -95,6 +95,7 @@ button:disabled{opacity:.5;cursor:default}
 #brewCap{position:fixed;left:50%;bottom:max(84px,calc(env(safe-area-inset-bottom,0px) + 80px));transform:translateX(-50%);background:var(--glass);border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13.5px;max-width:calc(100% - 32px);text-align:center;backdrop-filter:blur(8px);pointer-events:none}
 #loading{position:fixed;inset:0;display:grid;place-items:center;align-content:center;gap:14px;background:var(--bg);font-family:var(--f-display);font-size:18px;letter-spacing:.12em;color:var(--muted);transition:opacity .8s}
 #loading small{font-family:var(--f-body);font-size:12px;letter-spacing:.04em}
+#loading small.build{opacity:.6;font-size:11px}
 #loading .lamp{width:96px;height:120px;overflow:visible}
 #loading .lamp-flame{transform-origin:60px 70px;transform-box:view-box;animation:flicker 1.7s ease-in-out infinite}
 #loading .lamp-glow{transform-origin:60px 62px;transform-box:view-box;animation:glow 2.3s ease-in-out infinite}
@@ -176,7 +177,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.03-2100</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -439,7 +440,7 @@ function updateSound(t,dt){if(!SND.on||!SND.ac)return;const ac=SND.ac,N=SND.next
   const pv=0;SND.pour.gain.setTargetAtTime(pv*.55,ac.currentTime,.05);if(pv>0){SND.pourBP.frequency.setTargetAtTime(1200+Math.random()*900,ac.currentTime,.03);SND.pourBP2.frequency.setTargetAtTime(700+Math.random()*700,ac.currentTime,.02);}
   for(const k in N)N[k]-=dt;
   N.chime=99;
-  // (low singing-bowl hum removed)
+  if(N.bowl===undefined)N.bowl=5;if(N.bowl<=0){singingBowl();N.bowl=60;}
   if(N.nut===undefined)N.nut=15;if(N.nut<=0){nutShaker();N.nut=40;}
   // (frog chorus at night removed)
   if(N.bird<=0){if(night<.5)bird(.8);N.bird=5+Math.random()*12;}}
