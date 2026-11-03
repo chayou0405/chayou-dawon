@@ -77,7 +77,7 @@ function onMessage(conn, m) {
       if (ti < 0 || ti >= NTABLES || k < 0 || k >= NSEAT) return;
       const holder = c.seats[ti][k];
       if (holder && holder !== p.uid) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'taken' });
-      if (k === 0 && !(p.tea && p.teaLeft > 0)) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'noTea' });   // 팽주석 needs a tea from the cabinet
+      if (k === 0 && holder !== p.uid && !(p.tea && p.teaLeft > 0)) return send(conn.ws, { t: 'seatDenied', ti, k, why: 'noTea' });   // keeps a host who already sits there   // 팽주석 needs a tea from the cabinet
       if (p.seat && (p.seat[0] !== ti || p.seat[1] !== k)) freeSeat(c, p);
       c.seats[ti][k] = p.uid; p.seat = [ti, k];
       if (k === 0) c.tables[ti].tea = p.tea;
