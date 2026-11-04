@@ -12,7 +12,8 @@ const http = require('http'), crypto = require('crypto'), fs = require('fs'), pa
 
 const PORT = +process.env.PORT || 8080;
 const CAP = +process.env.CAP || 88;            // per channel, hosts and guests included
-const GRACE = +process.env.GRACE_MS || 90000;   // a dropped connection keeps its character, name and seat this long (phones in the background)
+const GRACE = +process.env.GRACE_MS || 40000;   // a dropped connection keeps its character, name and seat this long
+const HIDE_MS = +process.env.HIDE_MS || 45000;  // a page left in the background (tab switched away, phone app switched, screen off) leaves after this
 const LEAVE_MS = +process.env.LEAVE_MS || 6000;   // after the page says goodbye, the character leaves this soon unless a reload brings it back
 const LOG = process.env.DEBUG_LOG !== '0';     // dev log to stdout (server console only, never shown to players)
 const MAX_CHANNELS = 50, NTABLES = 8, NSEAT = 5, INFUSIONS = 3, SIPS = 3;   // brewed once, then shared up to 3 times; a poured cup is three sips
@@ -82,6 +83,14 @@ function freeSeat(c, p) {
     setSeat(c, ti, k, null); L('stand', { uid: p.uid, ch: c.id, seat: seatId(p.seat) });
   }
   p.seat = null;
+}
+// gone for real while its socket may still be open: remove it, tell that page (it reconnects only once it is visible again)
+function expire(c, p, why) {
+  if (c.players.get(p.uid) !== p) return;
+  clearTimeout(p.graceTimer); clearTimeout(p.byeTimer); clearTimeout(p.hideTimer);
+  const ws = p.ws; p.ws = null; p.online = false;
+  removePlayer(c, p, why);
+  if (ws) { send(ws, { t: 'expired' }); try { ws.close(); } catch (e) {} }
 }
 function removePlayer(c, p, why) {
   L('remove', { uid: p.uid, ch: c.id, why, seat: seatId(p.seat) });
@@ -191,11 +200,15 @@ function onMessage(conn, m) {
     }
     case 'bye': {   // the page is closing; a reload comes straight back with the same session and keeps everything
       L('bye', { uid: p.uid, cid: conn.cid, ch: c.id, seat: seatId(p.seat) });
-      clearTimeout(p.byeTimer); p.byeTimer = setTimeout(() => { if (c.players.get(p.uid) === p && p.byeCid === conn.cid) { clearTimeout(p.graceTimer); removePlayer(c, p, 'left'); } }, LEAVE_MS);
+      clearTimeout(p.byeTimer); p.byeTimer = setTimeout(() => { if (c.players.get(p.uid) === p && p.byeCid === conn.cid) expire(c, p, 'left'); }, LEAVE_MS);
       p.byeCid = conn.cid; break;
     }
     case 'mood': if (typeof m.e === 'string' && m.e.length <= 8) broadcast(c, { t: 'mood', uid: p.uid, e: m.e }, conn.ws); break;
     case 'ping': send(conn.ws, { t: 'pong' }); break;
+    // the page went to the background: a browser keeps the connection (and answers pings) for a hidden tab
+    // indefinitely, so without this the character would stay in its seat long after the person has gone
+    case 'hide': if (!p.hidden) { p.hidden = true; clearTimeout(p.hideTimer); p.hideTimer = setTimeout(() => expire(c, p, 'hidden'), HIDE_MS); L('hide', { uid: p.uid, ch: c.id, seat: seatId(p.seat) }); } break;
+    case 'show': if (p.hidden) { p.hidden = false; clearTimeout(p.hideTimer); L('show', { uid: p.uid, ch: c.id }); } break;
   }
 }
 
@@ -210,7 +223,7 @@ function hello(conn, m) {
   const back = typeof m.sid === 'string' && c.bySid.get(m.sid);
   let p = back && c.players.get(back);
   if (p) {
-    clearTimeout(p.graceTimer); p.graceTimer = null; clearTimeout(p.byeTimer); p.byeCid = null;
+    clearTimeout(p.graceTimer); p.graceTimer = null; clearTimeout(p.byeTimer); p.byeCid = null; clearTimeout(p.hideTimer); p.hidden = false;
     const wasOnline = p.online;
     if (p.online && p.ws !== conn.ws) {   // the session's older connection is still open (a half-dead socket, or the same session in another tab)
       send(p.ws, { t: 'replaced' }); const old = p.ws; p.ws = null; try { old.close(); } catch (e) {}
@@ -251,7 +264,7 @@ function onClose(conn) {
   p.online = false; p.ws = null; L('away', { uid: p.uid, cid: conn.cid, ch: c.id, seat: seatId(p.seat), graceMs: GRACE });
   broadcast(c, { t: 'away', uid: p.uid });
   // character, name and seat stay during the grace window; only its end (or a real leave) clears them
-  p.graceTimer = setTimeout(() => { if (!p.online && c.players.get(p.uid) === p) removePlayer(c, p, 'graceExpired'); }, GRACE);
+  p.graceTimer = setTimeout(() => { if (!p.online && c.players.get(p.uid) === p) expire(c, p, 'graceExpired'); }, GRACE);
 }
 
 /* ---------- static files ---------- */
@@ -306,6 +319,6 @@ function wsRaw(ws, op, payload) {
 function wsSend(ws, s) { if (ws.readyState === 1) wsRaw(ws, 0x81, Buffer.from(s, 'utf8')); }
 // drop connections that went silent (phone locked, network gone) so their grace timer starts
 const conns = new Set();
-setInterval(() => { for (const c of conns) { if (!c.alive) { try { c.ws.sock.destroy(); } catch (e) {} continue; } c.alive = false; wsRaw(c.ws, 0x89, Buffer.alloc(0)); } }, 20000);
+setInterval(() => { for (const c of conns) { if (!c.alive) { try { c.ws.sock.destroy(); } catch (e) {} continue; } c.alive = false; wsRaw(c.ws, 0x89, Buffer.alloc(0)); } }, 10000);
 
 server.listen(PORT, () => console.log(`차요우 다원 서버: http://localhost:${PORT}  (실시간: ws://localhost:${PORT}/ws, 서버당 ${CAP}명)`));

@@ -179,7 +179,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-0330</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-1700</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2093,7 +2093,7 @@ const NET=(()=>{
   let ch=(q.get('server')||'1').replace(/[^0-9a-z-]/gi,'').slice(0,16)||'1';
   const KEY='chayou-sid:';
   const store={get(){try{return sessionStorage.getItem(KEY+ch);}catch(e){return null;}},set(v){try{sessionStorage.setItem(KEY+ch,v);}catch(e){}},clear(){try{sessionStorage.removeItem(KEY+ch);}catch(e){}}};
-  let replacedBy=false,ws=null,status='idle',uid=null,nick=null,cap=88,started=false,retry=0,retryT=null,pingT=null,sendT=0,last='',moving=false,cid=null,nConn=0;
+  let expired=false,replacedBy=false,ws=null,status='idle',uid=null,nick=null,cap=88,started=false,retry=0,retryT=null,pingT=null,sendT=0,last='',moving=false,cid=null,nConn=0;
   // dev log: only with ?debug in the link (or localStorage chayou-debug=1). Goes to window.__chayouLog and console.debug, never on screen.
   const DEV=q.has('debug')||(()=>{try{return localStorage.getItem('chayou-debug')==='1';}catch(e){return false;}})();
   const logBuf=[];if(DEV)window.__chayouLog=logBuf;
@@ -2188,7 +2188,7 @@ const NET=(()=>{
         {const sv=m.me&&m.me.seat&&seatAt(m.me.seat[0],m.me.seat[1]);
           if(me.seat)out({t:'sit',ti:me.seat.table.i,k:me.seat.k});   // keep (or re-claim) the seat this page is sitting on
           else if(sv)restoreSeat(sv);}   // the server still holds a seat for this session: sit back there
-        setNameTag(me,nick);setStatus('connected');last='';
+        setNameTag(me,nick);setStatus('connected');last='';if(document.hidden)out({t:'hide'});
         if(!m.resumed)toast(`${nick} 님, ${ch}채널에 들어왔어요`);break;}
       case 'full':{cap=m.cap||cap;setStatus('full');showFull(m);try{ws.close();}catch(e){}break;}
       case 'enter':case 'back':{log(m.t,{uid:short(m.p.uid),nick:m.p.nick,seat:m.p.seat?`T${m.p.seat[0]}-${m.p.seat[1]}`:null,known:members.has(m.p.uid)});
@@ -2200,6 +2200,7 @@ const NET=(()=>{
       case 'seatDenied':{const s=seatAt(m.ti,m.k);log('seatDenied',{seat:`T${m.ti}-${m.k}`,why:m.why,holder:short(m.holder)});
         if(s)unseatMe(s,'denied:'+m.why);if(m.holder)applySeat(m.ti,m.k,m.holder,m.v);
         toast(m.why==='noTea'?'팽주가 되려면 먼저 찻장에서 차를 골라 주세요':'이미 다른 분이 앉은 자리예요');break;}
+      case 'expired':{log('expired',{});expired=true;break;}   // the server let this hidden page go; it rejoins when shown again
       case 'replaced':{   // another live tab took this session over: carry on as a new visitor instead of fighting over it
         log('replaced',{});replacedBy=true;store.clear();break;}
       case 'player':{if(m.uid===uid){me.tea=m.tea;me.teaLeft=m.teaLeft;me.brewedAt=m.tea&&m.brewedAt!=null?m.brewedAt:null;lastHud='';}break;}
@@ -2223,14 +2224,18 @@ const NET=(()=>{
     const sock=ws,n=++nConn;
     sock.onopen=()=>{log('open',{conn:n,retry,sid:!!store.get()});sock.send(JSON.stringify({t:'hello',ch,sid:store.get(),prev:prevSid,inst:INST,look:ME_LOOK}));prevSid=null;clearInterval(pingT);pingT=setInterval(()=>out({t:'ping'}),15000);};
     sock.onmessage=e=>{if(ws!==sock)return;let m;try{m=JSON.parse(e.data);}catch(x){return;}onMsg(m);};   // a replaced socket's late messages are ignored
-    sock.onclose=ev=>{log('close',{conn:n,code:ev&&ev.code,current:ws===sock});if(ws!==sock)return;clearInterval(pingT);if(status==='full')return;if(replacedBy){replacedBy=false;retry=0;}scheduleRetry();};
+    sock.onclose=ev=>{log('close',{conn:n,code:ev&&ev.code,current:ws===sock});if(ws!==sock)return;clearInterval(pingT);if(status==='full')return;if(expired){setStatus('reconnecting');return;}if(replacedBy){replacedBy=false;retry=0;}scheduleRetry();};
     sock.onerror=()=>{};}
   function scheduleRetry(){retry++;if(retry>6&&status!=='connected'&&!uid){setStatus('failed');}else setStatus('reconnecting');retryT=setTimeout(connect,Math.min(15000,1000*Math.pow(1.6,retry)));}
   // leaving the page (closing the tab, going to another site): tell the server so the character leaves within seconds.
   // A reload sends this too, but comes back before the server lets the character go; a page kept in the
   // back/forward cache (persisted) is not leaving.
-  addEventListener('pagehide',e=>{if(e.persisted)return;log('bye',{});try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:'bye'}));}catch(x){}});
-  addEventListener('online',()=>{if(status!=='connected'&&status!=='full'){retry=0;connect();}});
+  addEventListener('pagehide',e=>{if(e.persisted)return;log('bye',{});try{if(ws&&ws.readyState===1){ws.send(JSON.stringify({t:'bye'}));ws.close();}}catch(x){}});
+  // background / foreground: the server lets a page that stays hidden leave after a while
+  document.addEventListener('visibilitychange',()=>{log(document.hidden?'hidden':'visible',{});
+    if(status==='connected')out({t:document.hidden?'hide':'show'});
+    if(!document.hidden&&expired){expired=false;retry=0;connect();}});   // back after being let go: come in again
+  addEventListener('online',()=>{if(status!=='connected'&&status!=='full'&&!expired){retry=0;connect();}});
   return{
     start(){if(started)return;started=true;info();const sid=store.get()||prevSid;
       // still open in another tab? then that tab keeps it: this one neither resumes it nor asks the server to drop it

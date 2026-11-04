@@ -23,4 +23,4 @@ GitHub Pages는 파일만 보여 주는 곳이라 실시간 서버를 돌릴 수
 
 - 브라우저: 주소 끝에 `&debug`를 붙이면 연결·재연결·착석·퇴석·캐릭터 생성/삭제가 `window.__chayouLog`와 개발자 도구 콘솔(console.debug)에 사용자 ID, 연결 ID, 채널, 좌석 ID와 함께 남아요.
 - 서버: Render의 Logs 탭에 connect / enter / resume / takeover / away / closeStale / sit / sitDenied / stand / remove 줄이 남아요. 끄려면 환경 변수 `DEBUG_LOG=0`.
-- 재접속 유예 시간은 `GRACE_MS`(기본 90초)예요. 이 시간 안에는 캐릭터와 좌석이 그대로 유지돼요.
+- 재접속 유예 시간은 `GRACE_MS`(기본 40초), 화면이 뒤로 간 채로 머무는 시간은 `HIDE_MS`(기본 45초)예요. 이 시간이 지나면 캐릭터가 퇴장하고, 다시 화면에 돌아오면 같은 이름으로 다시 들어와요.
