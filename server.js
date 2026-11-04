@@ -27,7 +27,9 @@ const NICKS = A.flatMap(a => B.map(b => a + b));   // 144
 // up to 10 people: 10 NPCs, 20: 8, 30: 7, 40: 6, 50: 5, 60: 4, 70: 3, 80: 2, more: 1
 const npcCount = users => users <= 10 ? 10 : Math.max(1, 10 - Math.ceil(users / 10));
 // seats they take, in order (a host before its guests; the last ones leave first). Seat holder id: "npc:ti-k"
-const NPC_PLAN = [[0, 0], [0, 1], [0, 2], [4, 0], [4, 1], [7, 0], [7, 2], [0, 3], [4, 3], [7, 4]];
+const NPC_PLAN = [[0, 0], [0, 1], [0, 2], [1, 1], [1, 2], [4, 0], [4, 1], [7, 0], [7, 2], [0, 3]];
+// table 1 (이번 찻자리): two NPC guests and an empty host seat, so anyone can try being the host
+const HOSTLESS = new Set([1]);
 const isNpc = h => typeof h === 'string' && h.startsWith('npc:');
 
 const channels = new Map();
@@ -40,7 +42,7 @@ function syncNpcs(c) {
   for (const [ti, k] of NPC_PLAN) {
     if (n <= 0) break; const h = c.seats[ti][k];
     if (h && !isNpc(h)) continue;                                       // a person sits there: skip this seat
-    if (k > 0) { const host = c.seats[ti][0]; if (!(want.has(ti + '-0') || (host && isNpc(host) && want.has(ti + '-0')))) continue; }   // NPC guests only at an NPC host's table
+    if (k > 0 && !HOSTLESS.has(ti) && !want.has(ti + '-0')) continue;   // NPC guests only at an NPC host's table (or the open host table)
     want.add(ti + '-' + k); n--;
   }
   // leave first (guests before hosts), then sit down
