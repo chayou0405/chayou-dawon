@@ -174,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.05-0130</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.05-0135</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2386,7 +2386,7 @@ function kstNight(){const d=new Date(Date.now()+9*3600e3),h=d.getUTCHours()+d.ge
 let manualNightUntil=0;
 function followKoreaTime(snap){if(Date.now()<manualNightUntil)return;nightTarget=kstNight();if(snap){night=nightTarget;applyNight(night);}$('nightBtn').textContent=nightTarget>.5?'낮으로':'밤으로';}
 followKoreaTime(true);setInterval(()=>followKoreaTime(false),60000);
-$('nightBtn').addEventListener('click',()=>{manualNightUntil=Date.now()+60*60e3;nightTarget=nightTarget>.5?0:1;$('nightBtn').textContent=nightTarget?'낮으로':'밤으로';toast(nightTarget?'밤이 되었어요. 호숫가 석등이 켜졌어요':'다시 해 질 녘이에요');});
+$('nightBtn').addEventListener('click',()=>{manualNightUntil=Date.now()+60*60e3;nightTarget=nightTarget>.5?0:1;$('nightBtn').textContent=nightTarget?'낮으로':'밤으로';toast(nightTarget?'밤이 되었어요. 호숫가 석등이 켜졌어요':'낮이 되었어요');});
 
 /* ---------- tea cabinet & first-person brewing ---------- */
 function nearCabinet(){return inRect(me.x,me.z,ROOM)&&me.z>HALF-2.6&&me.x>CAB.x0-.3&&me.x<CAB.x1+.3;}
