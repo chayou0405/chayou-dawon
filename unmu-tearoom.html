@@ -174,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-2400</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.05-0130</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -291,9 +291,9 @@ const waterNormals=(()=>{const N=256,c=document.createElement('canvas');c.width=
 /* ---------- materials ---------- */
 const M=(color,o={})=>new THREE.MeshStandardMaterial(Object.assign({color,roughness:.8,metalness:0},o));
 const MAT={
-  redLac:M(0xb08055,{map:woodMap2,roughness:.6}), darkLac:M(0x5a3a24,{map:woodMap2,roughness:.6}),
-  floor:M(0xb3aba3,{map:woodMap,roughness:.55}),
-  wood:M(0x6a4632,{map:woodMap2,roughness:.6}), woodDark:M(0x3e2618,{map:woodMap2,roughness:.55}),
+  redLac:M(0xb08055,{map:woodMap2,roughness:.82}), darkLac:M(0x5a3a24,{map:woodMap2,roughness:.82}),
+  floor:M(0xb3aba3,{map:woodMap,roughness:.88}),
+  wood:M(0x6a4632,{map:woodMap2,roughness:.82}), woodDark:M(0x3e2618,{map:woodMap2,roughness:.82}),
   stone:M(0x857c72,{roughness:.95}), stoneLight:M(0xc9c1b4,{roughness:.9}),
   greyRoof:M(0xffffff,{map:tileTex,roughness:.85,side:THREE.DoubleSide}), ridge:M(0x2a2826),
   ceiling:M(0xc79e72,{map:woodMap2,roughness:.75}), bracket:M(0x6b4a30,{map:woodMap2,roughness:.7}),
@@ -302,14 +302,14 @@ const MAT={
   cap:M(0x2b1a10), tassel:M(0xb0301e),
   celadon:M(0x9dc3ac,{roughness:.35}), pot:M(0x3f3a39,{roughness:.6}), leaf:M(0x3c5a35,{roughness:.9}),
   trunk:M(0x3b2b20), pine:M(0x2f4430,{roughness:1}), willow:M(0x7f9150,{roughness:1}), blossom:M(0xd9a3a6,{roughness:1}),
-  topWood:M(0x5a3622,{map:woodMap2,roughness:.45}), leg:M(0x2e1a10,{roughness:.6}), tray:M(0x22150e,{roughness:.4}),
+  topWood:M(0x5a3622,{map:woodMap2,roughness:.78}), leg:M(0x2e1a10,{roughness:.82}), tray:M(0x22150e,{roughness:.75}),
   clay:M(0x7a3826,{roughness:.5}), clayDS:M(0x7a3826,{roughness:.5,side:THREE.DoubleSide}), porcelain:M(0xf3eee4,{roughness:.22}), porcelainDS:M(0xf3eee4,{roughness:.22,side:THREE.DoubleSide}), liquor:M(0xb8742a,{roughness:.15}),
   glass:new THREE.MeshStandardMaterial({color:0xe9f1ee,transparent:true,opacity:.32,roughness:.05,metalness:.1}),
-  stool:M(0x6e2a1b,{roughness:.5}), silkGold:M(0xc0974f,{roughness:.7}), silkRed:M(0x8e2a20,{roughness:.7}), chair:M(0x3a1f14,{roughness:.5}),
-  bamboo:M(0x9a9a52,{roughness:.6}), bambooLeaf:M(0x4f6b34,{roughness:1}), woven:M(0xffffff,{map:wovenTex,roughness:.9,side:THREE.DoubleSide}),
+  stool:M(0x6e2a1b,{roughness:.78}), silkGold:M(0xc0974f,{roughness:.7}), silkRed:M(0x8e2a20,{roughness:.7}), chair:M(0x3a1f14,{roughness:.78}),
+  bamboo:M(0x9a9a52,{roughness:.8}), bambooLeaf:M(0x4f6b34,{roughness:1}), woven:M(0xffffff,{map:wovenTex,roughness:.9,side:THREE.DoubleSide}),
   hull:M(0x5a3a26,{map:woodMap2,roughness:.6}),
-  plaster:M(0xffffff,{map:plasterTex,roughness:.95}), rattan:M(0xffffff,{map:rattanTex,roughness:.8}), cane:M(0xc79a5b,{roughness:.55}),
-  runner:M(0xffffff,{map:runnerTex,roughness:.9}), bambooTray:M(0xffffff,{map:trayTex,roughness:.6}),
+  plaster:M(0xffffff,{map:plasterTex,roughness:.95}), rattan:M(0xffffff,{map:rattanTex,roughness:.8}), cane:M(0xc79a5b,{roughness:.78}),
+  runner:M(0xffffff,{map:runnerTex,roughness:.9}), bambooTray:M(0xffffff,{map:trayTex,roughness:.82}),
   copper:M(0xc27a4e,{metalness:.65,roughness:.35}), pewter:M(0x9c9c98,{metalness:.6,roughness:.4}), grape:M(0x5a2448,{roughness:.3}),
   moss:M(0x8f9a70,{map:rockMap,roughness:.95}), paper:M(0xffffff,{map:scrollTex,roughness:.9}), plum:M(0xe58fae,{roughness:.8}), plumDark:M(0xc4507e,{roughness:.8}),
   carved:M(0x4a2c1c,{map:woodMap2,roughness:.5}), ivy:M(0x37502c,{roughness:1}),
@@ -712,7 +712,7 @@ for(let z=-HALF+.3;z<HALF;z+=.65)add(box(2*HALF+.6,.12,.1),MAT.redLac,0,H-.06,z,
 // name board under the front eave, over the entrance: the 茶 seal logo in gold on dark lacquer
 {const tex=logoTex(640,224,(g,w,h)=>{g.fillStyle='#24140e';g.fillRect(0,0,w,h);const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(255,255,255,.06)');gr.addColorStop(1,'rgba(0,0,0,.18)');g.fillStyle=gr;g.fillRect(0,0,w,h);
     g.strokeStyle='#b8893e';g.lineWidth=8;g.strokeRect(12,12,w-24,h-24);g.lineWidth=2.5;g.strokeRect(26,26,w-52,h-52);drawLogo(g,w/2,h/2,h*.66,'#d9b062');});
-  const fm=M(0x3a2216,{map:woodMap2,roughness:.5}),gm=M(0xc69a52,{metalness:.5,roughness:.35});
+  const fm=M(0x3a2216,{map:woodMap2,roughness:.8}),gm=M(0xc69a52,{metalness:.5,roughness:.35});
   const g=new THREE.Group();g.position.set(0,H-.82,-HALF-.34);g.scale.setScalar(1.65);scene.add(g);
   add(box(2.05,.76,.08),fm,0,0,0,g,'shell');const pl=add(new THREE.PlaneGeometry(1.9,.665),M(0xffffff,{map:tex,roughness:.45}),0,0,-.042,g);pl.rotation.y=Math.PI;
   for(const sx of[-1,1]){add(cyl(.012,.012,.34,6),gm,sx*.8,.53,0,g,'shell');add(new THREE.SphereGeometry(.03,10,8),gm,sx*.8,.37,-.045,g,'shell');}}
@@ -807,7 +807,7 @@ const STONEVASE_M=M(0xdedbd2,{map:rockMap,roughness:.92});
     y0+=rh;});}
 // cabinet doors: lattice leaves that swing open when you open the cabinet
 const cabBays=[],cabLeaves=[];
-{const frameM=M(0x4a2618,{map:woodMap2,roughness:.5}),brass=M(0xc9a35a,{metalness:.6,roughness:.35}),
+{const frameM=M(0x4a2618,{map:woodMap2,roughness:.8}),brass=M(0xc9a35a,{metalness:.6,roughness:.35}),
   latM=new THREE.MeshStandardMaterial({color:0x6a3622,roughness:.6,transparent:true,alphaTest:.4,side:THREE.DoubleSide,map:canvasTex(128,256,(g,w,h)=>{g.clearRect(0,0,w,h);g.strokeStyle='#fff';g.lineWidth=5;
     for(let x=0;x<=w;x+=64){g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}for(let y=0;y<=h;y+=128){g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
     g.lineWidth=4;for(let y=0;y<h;y+=128)for(let x=0;x<w;x+=64)for(const[cx,cy,sx,sy]of[[x,y,1,1],[x+64,y,-1,1],[x,y+128,1,-1],[x+64,y+128,-1,-1]]){g.beginPath();g.moveTo(cx+sx*18,cy);g.lineTo(cx+sx*18,cy+sy*10);g.lineTo(cx+sx*10,cy+sy*18);g.lineTo(cx,cy+sy*18);g.stroke();}})});
@@ -2380,7 +2380,13 @@ for(const m of ringMats)m.color.setRGB(1-k*.75,1-k*.72,1-k*.65);
   if(water){water.material.uniforms.sunColor.value.setRGB(1-k*.6,.86-k*.45,.72-k*.25);}
   for(const sp of raftGlows){sp.material.opacity=.3+k*.7;const s=.9+k*1.3;sp.scale.set(s,s,1);}
   for(const sp of lakeGlows){const big=sp.userData.big;sp.material.opacity=big?.12+k*.32:.18+k*.4;const s=big?3.6+k*4.2:1.8+k*2.6;sp.scale.set(s,s,1);}}
-$('nightBtn').addEventListener('click',()=>{nightTarget=nightTarget?0:1;$('nightBtn').textContent=nightTarget?'낮으로':'밤으로';toast(nightTarget?'밤이 되었어요. 호숫가 석등이 켜졌어요':'다시 해 질 녘이에요');});
+// how dark it is right now in Korea: full day 07:00–17:00, dusk 17:00–19:00, night 19:00–05:00, dawn 05:00–07:00
+function kstNight(){const d=new Date(Date.now()+9*3600e3),h=d.getUTCHours()+d.getUTCMinutes()/60;
+  return h<5||h>=19?1:h<7?1-(h-5)/2:h>=17?(h-17)/2:0;}
+let manualNightUntil=0;
+function followKoreaTime(snap){if(Date.now()<manualNightUntil)return;nightTarget=kstNight();if(snap){night=nightTarget;applyNight(night);}$('nightBtn').textContent=nightTarget>.5?'낮으로':'밤으로';}
+followKoreaTime(true);setInterval(()=>followKoreaTime(false),60000);
+$('nightBtn').addEventListener('click',()=>{manualNightUntil=Date.now()+60*60e3;nightTarget=nightTarget>.5?0:1;$('nightBtn').textContent=nightTarget?'낮으로':'밤으로';toast(nightTarget?'밤이 되었어요. 호숫가 석등이 켜졌어요':'다시 해 질 녘이에요');});
 
 /* ---------- tea cabinet & first-person brewing ---------- */
 function nearCabinet(){return inRect(me.x,me.z,ROOM)&&me.z>HALF-2.6&&me.x>CAB.x0-.3&&me.x<CAB.x1+.3;}
