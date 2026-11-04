@@ -174,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-2330</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-2340</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2144,7 +2144,9 @@ const NET=(()=>{
     P.b=Array.isArray(s.b)?s.b:null;const c=P.c;
     if(P.seat){P.st=s;if(c)placeSeated(P,false);return;}   // seated: the seat decides where the character is, not position packets
     P.tx=s.x;P.ty=s.y;P.tz=s.z;P.try=s.ry;P.m=s.m;if(!c)return;c.root.visible=!!s.v;
-    if(snap||!P.seen){P.seen=true;c.x=s.x;c.y=s.y;c.z=s.z;c.ry=s.ry;c.root.position.set(c.x,c.y,c.z);}
+    // a big jump (stepping off a raft mid-lake back onto the landing, a teleport) is not glided across the water
+    if(snap||!P.seen||Math.hypot(c.x-s.x,c.z-s.z)>3||(P.b0&&!P.b)){P.seen=true;c.x=s.x;c.y=s.y;c.z=s.z;c.ry=s.ry;c.root.position.set(c.x,c.y,c.z);}
+    P.b0=P.b;
     if(s.p!==P.pose){P.pose=s.p;setPose(c,s.p==='squat'?'squat':s.p==='sit'?'sit':'stand',s.st);}}
   function drop(P,why){log('avatarDelete',{uid:short(P.uid),nick:P.nick,why,seat:P.seat?`T${P.seat.table.i}-${P.seat.k}`:null});
     if(P.raft)P.raft.g.visible=false;if(P.c){scene.remove(P.c.root);if(P.c.bubble){scene.remove(P.c.bubble.sp);P.c.bubble=null;}}
@@ -2247,7 +2249,7 @@ const NET=(()=>{
         c.root.updateMatrixWorld(true);updateChar(c,dt,!!P.m&&P.pose==='stand');
         // a player on a raft sits on the same raft seat on every screen: their raft is drawn under them, unless one of
         // this screen's moored rafts is already in exactly that spot
-        if(P.b&&P.online!==false){if(!P.raft){P.raft=makeRaft(0,true);P.raft.g.position.set(P.b[0],LAKE.y-.08,P.b[1]);P.raft.g.rotation.y=P.b[2];}const g=P.raft.g;
+        if(P.b){if(!P.raft){P.raft=makeRaft(0,true);P.raft.g.position.set(P.b[0],LAKE.y-.08,P.b[1]);P.raft.g.rotation.y=P.b[2];}const g=P.raft.g;
           g.position.x+=(P.b[0]-g.position.x)*k;g.position.z+=(P.b[1]-g.position.z)*k;g.rotation.y=lerpAngle(g.rotation.y,P.b[2],k);g.position.y=LAKE.y-.08+Math.sin(performance.now()/770)*.03;
           g.visible=!POOL.some(Q=>Q.state==='berth'&&Q.r.g.visible&&Math.hypot(Q.r.g.position.x-g.position.x,Q.r.g.position.z-g.position.z)<1.2);
           P.raft.man.root.updateMatrixWorld(true);updateAction(P.raft.man,dt);}
