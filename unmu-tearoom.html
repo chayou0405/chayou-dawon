@@ -174,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-2340</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-2400</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -206,6 +206,7 @@ let renderer;
 try{ renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'}); }
 catch(e){ $('loading').firstElementChild.textContent='이 기기에서는 3D(WebGL)를 열 수 없어요.'; return; }
 renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch?1.5:2));
+renderer.localClippingEnabled=true;   // the water in a tilted glass pot is cut by a level plane
 if(!isTouch){ renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; }
 const scene=new THREE.Scene();
 const FOG=0xb9a898;
@@ -1130,7 +1131,8 @@ const VGLASS=new THREE.MeshStandardMaterial({color:0xeaf3f0,transparent:true,opa
 const VPORC=M(0xf6f3ec,{roughness:.18}),VBLUE=M(0x2e5aa6,{roughness:.3});
 function vesselInner(V,glassy){const pot=V.g;
   V.potWater=add(new THREE.CircleGeometry(.07,24).rotateX(-Math.PI/2),M(0xffffff,{transparent:true,opacity:glassy?.62:.85,roughness:.1,side:THREE.DoubleSide,depthWrite:!glassy}),0,.01,0,pot);V.potWater.visible=false;
-  if(glassy){V.vol=add(new THREE.CylinderGeometry(1,1,1,24,1,true).translate(0,.5,0),V.potWater.material,0,.004,0,pot);V.vol.visible=false;V.vol.renderOrder=1;}
+  if(glassy){V.clip=new THREE.Plane(new V3(0,-1,0),1e4);V.potWater.material.clippingPlanes=[V.clip];   // far away = no cut, except while pouring
+    V.vol=add(new THREE.CylinderGeometry(1,1,1,24,1,true).translate(0,.5,0),V.potWater.material,0,.004,0,pot);V.vol.visible=false;V.vol.renderOrder=1;}
   V.potLeaves=[];for(let q=0;q<18;q++){const lf=add(LEAF_GEO.flat,M(0x8fa23e,{roughness:.8}),0,0,0,pot);lf.visible=false;V.potLeaves.push(lf);}}
 function buildClayPot(g){const pot=new THREE.Group();g.add(pot);
   add(new THREE.LatheGeometry([new THREE.Vector2(.05,0),new THREE.Vector2(.068,.02),new THREE.Vector2(.078,.048),new THREE.Vector2(.072,.072),new THREE.Vector2(.055,.09),new THREE.Vector2(.037,.1),new THREE.Vector2(.034,.096)],24),MAT.clayDS,0,0,0,pot);
@@ -1664,9 +1666,24 @@ function incenseSpot(k,hand){const[sx,sz]=SEAT_LOCAL[k],L=Math.hypot(sx,sz),ux=s
 const smokeTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');const r=g.createRadialGradient(32,32,0,32,32,32);r.addColorStop(0,'rgba(235,232,228,.55)');r.addColorStop(1,'rgba(235,232,228,0)');g.fillStyle=r;g.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);})();
 function pourAbovePitcher(T,tipL,y,tl=.85){const tip=tipL.clone().applyEuler(new THREE.Euler(0,Math.PI/2,-tl)),pc=T.pitRest||T.pitcher.position;return new V3(pc.x-tip.x,y,pc.z-tip.z);}
 // during a pour: gaiwan lid slides back a crack on the pouring side; the glass pot's liquor visibly drains
+function lipStream(T){if(!T.lip){T.lip=new THREE.Mesh(cyl(.0055,.0058,1,6),T.liq);T.lip.layers.set(1);T.lip.visible=false;scene.add(T.lip);}return T.lip;}
+// glass pot while pouring: the tea inside keeps a level surface as the pot tilts and sinks as it runs out.
+// The water body fills the glass and is cut by a horizontal plane; a cap disc sits on that plane.
+function tiltedWater(T,b,poured){const V=T.vessel,pot=V.g;if(!V.vol)return;
+  if(b.wy0==null)b.wy0=V.potWater.visible?V.potWater.position.y:0;
+  if(b.wy0<=0||poured>=.999){V.vol.visible=V.potWater.visible=false;return;}
+  const O=pot.localToWorld(new V3(0,0,0)),upW=pot.localToWorld(new V3(0,1,0)).sub(O).normalize(),lowW=pot.localToWorld(new V3(profR(V.prof,V.floor)*.9,V.floor,0));
+  const inlet=pot.localToWorld(new V3(.049,.034,0));   // where the spout leaves the body
+  const start=Math.max(lowW.y+.004,Math.min(pot.localToWorld(new V3(0,b.wy0,0)).y,Math.max(inlet.y,pot.localToWorld(V.tip.clone()).y))),L=lerp(start,lowW.y,poured);
+  if(L<=lowW.y+.0008){V.vol.visible=V.potWater.visible=false;return;}
+  V.clip.constant=L+.0006;
+  const r=profR(V.prof,(V.floor+V.top)/2)*.93;V.vol.visible=true;V.vol.scale.set(r,V.top-.012,r);
+  const sAx=clamp((L-O.y)/Math.max(.05,upW.y),V.floor,V.top-.01),inv=pot.getWorldQuaternion(new THREE.Quaternion()).invert(),nL=new V3(0,1,0).applyQuaternion(inv);
+  V.potWater.visible=true;V.potWater.position.set(0,sAx,0);V.potWater.quaternion.setFromUnitVectors(new V3(0,1,0),nL);V.potWater.scale.setScalar(profR(V.prof,sAx)*.92/.07);}
+function levelWaterReset(T){const V=T.vessel;if(T.lip)T.lip.visible=false;if(!V.clip)return;V.clip.constant=1e4;V.potWater.quaternion.identity();V.potWater.visible=false;if(V.vol)V.vol.visible=false;}
 function vesselPourPose(T,open,tilt){const V=T.vessel;
   if(V.kind==='gaiwan'){V.lid.position.set(V.lidRest.x-.007*open,V.lidRest.y+.003*open,V.lidRest.z);V.lid.rotation.set(0,0,.2*open);}
-  if(V.kind==='glass'&&V.potWater.visible&&tilt>.15){V.potWater.visible=false;if(V.vol)V.vol.visible=false;}}
+}
 function verticalStream(T,tip){const pc=T.pitRest||T.pitcher.position,bottom=tableWorld(T,new V3(pc.x,pc.y+.1,pc.z),new V3());const len=Math.max(.02,tip.y-bottom.y);
   T.stream.position.set(tip.x,tip.y-len/2,tip.z);T.stream.scale.set(1,len,1);T.stream.quaternion.identity();}
 function lightIncense(T,pos){const g=new THREE.Group();g.position.copy(pos||INCENSE_POS).setY(TT);T.group.add(g);
@@ -2421,7 +2438,7 @@ function finishInfusion(T){T.ready=true;
 // guest still gets a cup (the server serves them before the seat is let go); before that, nothing is used up
 function leaveBrew(){const b=me.brew;if(!b)return;const T=b.T;me.brew=null;
   scoop.visible=false;kettle.visible=false;waterStream.visible=false;
-  T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;T.potWater.visible=false;
+  T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;T.potWater.visible=false;levelWaterReset(T);
   cam.mode='follow';me.root.visible=true;$('brewCap').hidden=true;lastHud='';
   if(b.step==='ready'){NET.log('brewCancelled',{});return;}
   T.pitcherLevel=Math.max(T.pitcherLevel,1);NET.log('brewFinishedOnStand',{step:b.step});finishInfusion(T);}
@@ -2462,8 +2479,17 @@ function stepBrew(b,dt){const T=b.T,pot=T.pot,sc=b.scoop||scoop,kt=b.kettle||ket
     pot.position.lerpVectors(rest,pour,lift);if(back>0)pot.position.lerpVectors(pour,rest,back);pot.rotation.set(0,Math.PI/2,-V.tilt*tilt);
     vesselPourPose(T,lift*(1-back),tilt);
     const pouring=t>1.2&&t<3.5;T.stream.visible=pouring;
-    if(pouring){pot.updateMatrixWorld(true);verticalStream(T,pot.localToWorld(V.tip.clone()));T.pitcherLevel=Math.min(1,T.pitcherLevel+dt*.45);}
-    if(t>4.8){pot.position.copy(rest);pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.busy=false;b.step='poured';lastHud='';}}
+    pot.updateMatrixWorld(true);
+    if(V.kind==='glass')tiltedWater(T,b,seg(t,1.2,3.5));
+    if(pouring){const tipW=pot.localToWorld(V.tip.clone());
+      if(V.kind==='gaiwan'){   // the tea runs out over the rim between bowl and lid, then falls: it starts just outside the lip
+        const ax=pot.localToWorld(new V3(0,V.tip.y,0)),out=new V3(tipW.x-ax.x,0,tipW.z-ax.z).normalize(),drop=tipW.clone().addScaledVector(out,.009).add(new V3(0,-.011,0));
+        const L=lipStream(T);L.visible=true;L.position.copy(tipW).add(drop).multiplyScalar(.5);L.scale.set(1,tipW.distanceTo(drop),1);L.quaternion.setFromUnitVectors(UP,tipW.clone().sub(drop).normalize());
+        verticalStream(T,drop);}
+      else verticalStream(T,tipW);
+      T.pitcherLevel=Math.min(1,T.pitcherLevel+dt*.45);}
+    if(T.lip&&!(pouring&&V.kind==='gaiwan'))T.lip.visible=false;
+    if(t>4.8){pot.position.copy(rest);pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.busy=false;b.step='poured';levelWaterReset(T);lastHud='';}}
 }
 // other players' brewing is replayed on this screen step by step (leaves, water, lid, fair cup) from the host's events
 const remoteBrews=new Map();
@@ -2474,7 +2500,7 @@ function startRemoteBrew(ti,tea){const T=tables[ti];if(!T||!TEAS[tea]||(me.brew&
   prepBrew(T,tea);remoteBrews.set(ti,b);}
 function remoteBrewStep(ti,step){const b=remoteBrews.get(ti);if(!b)return;if(['leafing','watering','closing'].includes(step)){b.step=step;b.t=0;if(step==='closing')b.T.busy=false;}}
 function endRemoteBrew(ti){const b=remoteBrews.get(ti);if(!b)return;remoteBrews.delete(ti);for(const o of[b.scoop,b.kettle,b.ws])scene.remove(o);
-  const T=b.T;T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;T.potWater.visible=false;}
+  const T=b.T;T.pot.position.copy(T.potRest);T.pot.rotation.set(0,Math.PI/2,0);T.lid.position.copy(T.lidRest);T.lid.rotation.set(0,0,0);T.stream.visible=false;T.busy=false;T.potWater.visible=false;levelWaterReset(T);}
 const AUTO_STEPS=['ready','leafDone','watered','closed'],BREW_PACE=.8;   // brewing runs at 80% speed
 function updateBrew(dt){
   // '차 우리기' runs leaves -> water -> lid -> fair cup by itself, with a short beat between steps
