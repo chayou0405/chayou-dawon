@@ -174,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-1740</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-1915</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -567,6 +567,7 @@ peakMat.color.setRGB(2.4,2.25,2.1);peakMat.emissive=new THREE.Color(0x3a2216);
 const PROFILE=[[1.16,0],[1.05,.04],[1.0,.14],[.985,.3],[.97,.48],[.955,.64],[.93,.76],[.88,.84],[.8,.9],[.66,.95],[.48,.985],[.26,1.0],[0,1.01]];
 const tuftPts=[];
 function danxia(x,z,r,h,seed,sx=1,sz=1){
+  {const d=Math.hypot(x,z);if(d<260){const k=1.22;x*=k;z*=k;}}   // the nearest row of peaks stands a little further back
   x*=1.65;z*=1.65;r*=.95;h*=.62;
   const pts=[];for(let i=0;i<PROFILE.length-1;i++){const[a0,b0]=PROFILE[i],[a1,b1]=PROFILE[i+1];for(let s=0;s<3;s++){const t=s/3;pts.push(new THREE.Vector2(r*lerp(a0,a1,t),h*lerp(b0,b1,t)));}}
   pts.push(new THREE.Vector2(0,h*1.01));
