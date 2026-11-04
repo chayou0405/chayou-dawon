@@ -179,7 +179,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-1720</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.04-1740</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -591,6 +591,9 @@ function danxia(x,z,r,h,seed,sx=1,sz=1){
 }
 [[-118,-218,34,62,1.3],[-64,-246,18,190,2.1,.8,1],[-8,-206,44,48,3.7,1.2,.9],[48,-252,26,150,4.4],[104,-214,36,80,5.9,1,1.25],[166,-262,30,172,6.6],[-184,-272,46,96,7.1],[22,-322,52,120,8.8],[-96,-330,22,200,9.2],[124,-326,48,64,10.4],
  [-36,-232,16,120,21.1,.9,.8],[78,-236,20,98,22.3],[-150,-236,28,140,23.7],[140,-230,24,56,24.5],
+ // more peaks to the left and right of the tea room, so the side views are not empty
+ [180,-90,30,120,31.1],[196,22,22,190,32.4,.9,1],[172,112,34,90,33.7],[262,-12,40,140,34.2],[252,132,30,112,35.9],[300,40,46,80,36.6],
+ [-176,-70,28,150,37.3],[-188,62,36,100,37.8],[-262,-44,26,172,38.5,.8,1],[-252,96,40,120,39.1],[-180,-178,24,92,40.6],[-300,30,44,90,41.2],
  [206,-40,40,70,11.3],[236,64,26,160,12.5],[152,176,40,58,13.9],[40,236,48,110,14.2],[-82,224,22,170,15.6],[-196,142,44,82,16.1],[-236,8,30,180,17.7],[-204,-124,40,64,18.3],[224,-142,26,150,19.9],[-30,-290,26,46,20.5]
 ].forEach(([x,z,r,h,s,sx,sz])=>danxia(x,z,r,h,s,sx,sz));
 {
@@ -1198,7 +1201,7 @@ const tables=[],seats=[],hitMeshes=[];
 const TABLE_LAYOUT=[[-5.6,-6.2,.18+Math.PI],[5.6,-5.9,-.2],[-6.9,.8,-.22],[.3,-2.0,.08+Math.PI],[6.8,1.2,-.15+Math.PI],[-5.4,7.0,.12],[.4,4.2,-.2+Math.PI],[6.2,7.2,.3]];
 // each table (with its tea set and chairs) is turned a quarter-turn step so the host seat sits on a different side and
 // faces a different view: every direction twice. Fixed numbers, so seats are in the same place on every PC and phone.
-const TABLE_TURN=[3,2,2,2,3,0,0,1];   // no host seat has its back to the tea-room entrance (the stairs on the -z side)
+const TABLE_TURN=[3,2,2,0,3,0,0,1];   // no host seat has its back to the tea-room entrance (the stairs on the -z side)
 function inTable(T,x,z,m){const dx=x-T.cx,dz=z-T.cz,c=Math.cos(T.rot),s=Math.sin(T.rot),lx=dx*c-dz*s,lz=dx*s+dz*c;return Math.abs(lx)<TB+m&&Math.abs(lz)<TB+m;}
 const tableName=i=>['일','이','삼','사','오','육','칠','팔','구'][i]+'번 찻자리';
 function makeCup(){const g=new THREE.Group();add(cupGeo,MAT.porcelainDS,0,0,0,g);const l=add(cupTeaGeo,MAT.liquor,0,CUP_Y0,0,g);return{g,liquid:l,level:0,state:'host'};}
@@ -2109,9 +2112,9 @@ const NET=(()=>{
   const short=u=>u?String(u).slice(0,8):null;
   const seatV=new Map(),holders=new Map();
   // NPC tea guests: the server puts them in seats (holder "npc:ti-k"); every screen draws the same ones
-  const npcChars=new Map(),npcHash=h=>{let x=0;for(const ch of h)x=(x*31+ch.charCodeAt(0))|0;return Math.abs(x);};
+  const npcChars=new Map(),NPC_LOOK_OF={},npcHash=h=>{let x=0;for(const ch of h)x=(x*31+ch.charCodeAt(0))|0;return Math.abs(x);};
   function npcSit(s,h){let ch=npcChars.get(h);if(ch&&ch.seat===s)return;if(ch)npcLeave(h,true);const T=s.table,k=s.k;
-    ch=makeChar(k===0?HOST_LOOKS[T.i%HOST_LOOKS.length]:NPC_LOOKS[npcHash(h)%NPC_LOOKS.length]);ch.isNpc=true;scene.add(ch.root);setLayer(ch.root,1);
+    ch=makeChar(NPC_LOOK_OF[h]||(k===0?HOST_LOOKS[T.i%HOST_LOOKS.length]:NPC_LOOKS[npcHash(h)%NPC_LOOKS.length]));ch.isNpc=true;scene.add(ch.root);setLayer(ch.root,1);
     readyCup(T,k);seatChar(ch,s);chars.push(ch);npcChars.set(h,ch);log('npcSit',{seat:`T${T.i}-${k}`});
     if(!T.npc)T.npc={host:null,guests:[],phase:'wait',timer:2+rnd()*4};
     const c=T.cups[k];c.state='guest';c.level=1;c.rest=c.guestPos.clone();c.g.position.copy(c.rest);c.g.visible=true;   // already enjoying a cup
@@ -2120,7 +2123,8 @@ const NET=(()=>{
     const i=chars.indexOf(ch);if(i>=0)chars.splice(i,1);
     if(s){if(s.occ===ch)s.occ=null;const T=s.table;if(T.npc){if(T.npc.host===ch)T.npc.host=null;T.npc.guests=T.npc.guests.filter(g=>g.ch!==ch);if(!T.npc.host&&!T.npc.guests.length)T.npc=null;}
       if(!quiet){if(s.k>0)vanishCup(T.cups[s.k]);else{const c=T.cups[0];c.vanishAt=null;c.state='host';c.level=0;c.rest=c.hostPos.clone();c.g.position.copy(c.rest);}}}
-    log('npcLeave',{});}   // "ti-k" -> last applied seat version / holder uid, as the server decided
+    log('npcLeave',{});}
+  NPC_LOOK_OF['npc:3-0']=HOST_LOOKS[0];NPC_LOOK_OF['npc:3-2']=NPC_LOOKS[npcHash('npc:0-3')%NPC_LOOKS.length];   // "ti-k" -> last applied seat version / holder uid, as the server decided
   const members=new Map();   // uid -> {uid,nick,look,c,tx,ty,tz,try,pose,m,seen,online,seat}
   const info=()=>{const el=$('netInfo');if(!el)return;const n=[...members.values()].filter(M=>M.online).length+1;
     el.textContent=status==='connected'?`${ch}채널 · ${n}/${cap}`:status==='connecting'?`접속 중… · ${ch}채널`:status==='reconnecting'?`재연결 중… · ${ch}채널`:status==='full'?`${ch}채널 만원 · ${cap}/${cap}`:status==='noserver'?'서버 미설정 · 혼자 보는 중':status==='failed'?'연결 실패 · 혼자 보는 중':'';

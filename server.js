@@ -27,9 +27,9 @@ const NICKS = A.flatMap(a => B.map(b => a + b));   // 144
 // up to 10 people: 10 NPCs, 20: 8, 30: 7, 40: 6, 50: 5, 60: 4, 70: 3, 80: 2, more: 1
 const npcCount = users => users <= 10 ? 10 : Math.max(1, 10 - Math.ceil(users / 10));
 // seats they take, in order (a host before its guests; the last ones leave first). Seat holder id: "npc:ti-k"
-const NPC_PLAN = [[0, 0], [0, 1], [0, 2], [1, 2], [1, 3], [4, 0], [4, 1], [7, 0], [7, 2], [0, 3]];
+const NPC_PLAN = [[3, 0], [3, 2], [0, 1], [0, 2], [1, 2], [1, 3], [4, 0], [4, 1], [7, 0], [7, 2]];
 // table 1 (이번 찻자리): an empty host seat anyone can try, with two NPC guests: one opposite the host (k2), one on the host's left (k3)
-const HOSTLESS = new Set([1]);
+const HOSTLESS = new Set([0, 1]);   // 일번 찻자리 too: its NPC guests wait for a person to host them
 const isNpc = h => typeof h === 'string' && h.startsWith('npc:');
 
 const channels = new Map();
