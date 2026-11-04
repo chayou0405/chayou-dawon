@@ -11,3 +11,7 @@ services:
     envVars:
       - key: CAP
         value: "88"
+      # visitor statistics are saved to the "stats" branch of this repo: a fine-grained GitHub token for this
+      # repository with "Contents: Read and write". Without it the counts are kept in memory only.
+      - key: STATS_GITHUB_TOKEN
+        sync: false

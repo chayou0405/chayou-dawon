@@ -174,7 +174,7 @@ button:disabled{opacity:.5;cursor:default}
   <g class="lamp-flame"><path d="M60 30 C67 44 72 54 70 64 C68 73 52 73 50 64 C48 54 53 44 60 30Z" fill="url(#lgFlame)"/><path d="M60 50 C63 57 64 61 63 65 C62 69 58 69 57 65 C56 61 57 57 60 50Z" fill="#fff8e0" opacity=".85"/></g>
   <rect x="58.6" y="66" width="2.8" height="9" rx="1.2" fill="#2a1c12"/>
   <path d="M26 78 Q60 72 94 78 Q90 96 60 98 Q30 96 26 78Z" fill="url(#lgDish)"/><ellipse cx="60" cy="78" rx="34" ry="5" fill="#3b2617"/><ellipse cx="60" cy="78" rx="28" ry="3.4" fill="#c69a4a" opacity=".55"/>
-  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.05-0135</small><small id="loadPct"></small></div>
+  <path d="M50 98 L46 128 Q60 134 74 128 L70 98Z" fill="#7a5232"/><ellipse cx="60" cy="130" rx="26" ry="6" fill="#5a3a22"/><ellipse cx="60" cy="128.5" rx="26" ry="5" fill="#8a6038"/></svg><span>다실에 불을 밝히는 중</span><small class="build">버전 11.05-0200</small><small id="loadPct"></small></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -2117,6 +2117,8 @@ const NET=(()=>{
   const logBuf=[];if(DEV)window.__chayouLog=logBuf;
   function log(ev,o={}){if(!DEV)return;const r={t:+(performance.now()/1000).toFixed(2),ev,me:uid&&uid.slice(0,8),cid,ch,...o};logBuf.push(r);if(logBuf.length>3000)logBuf.shift();try{console.debug('[chayou]',ev,JSON.stringify(o));}catch(e){}}
   const INST=Math.random().toString(36).slice(2,10);
+  // anonymous visitor id for the statistics (unique visitors, new vs returning): a random string kept in this browser
+  const VID=(()=>{try{let v=localStorage.getItem('chayou-vid');if(!v){v='v'+Math.random().toString(36).slice(2,12)+Date.now().toString(36);localStorage.setItem('chayou-vid',v);}return v;}catch(e){return null;}})();
   let prevSid=PREV_SIDS[KEY+ch]||null;   // this page load (a duplicated tab gets its own)
   // a duplicated browser tab copies sessionStorage, so two live tabs would share one session and keep taking the
   // character from each other. Before using a stored session, ask the other open tabs whether one of them is using it.
@@ -2242,7 +2244,7 @@ const NET=(()=>{
     setStatus(retry?'reconnecting':'connecting');
     try{ws=new WebSocket(URL_WS);}catch(e){scheduleRetry();return;}
     const sock=ws,n=++nConn;
-    sock.onopen=()=>{log('open',{conn:n,retry,sid:!!store.get()});sock.send(JSON.stringify({t:'hello',ch,sid:store.get(),prev:prevSid,inst:INST,look:ME_LOOK}));prevSid=null;clearInterval(pingT);pingT=setInterval(()=>out({t:'ping'}),15000);};
+    sock.onopen=()=>{log('open',{conn:n,retry,sid:!!store.get()});sock.send(JSON.stringify({t:'hello',ch,sid:store.get(),prev:prevSid,inst:INST,vid:VID,dev:isTouch?'phone':'pc',look:ME_LOOK}));prevSid=null;clearInterval(pingT);pingT=setInterval(()=>out({t:'ping'}),15000);};
     sock.onmessage=e=>{if(ws!==sock)return;let m;try{m=JSON.parse(e.data);}catch(x){return;}onMsg(m);};   // a replaced socket's late messages are ignored
     sock.onclose=ev=>{log('close',{conn:n,code:ev&&ev.code,current:ws===sock});if(ws!==sock)return;clearInterval(pingT);if(status==='full')return;if(expired){setStatus('reconnecting');return;}if(replacedBy){replacedBy=false;retry=0;}scheduleRetry();};
     sock.onerror=()=>{};}
